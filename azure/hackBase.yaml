@@ -20,7 +20,7 @@ master_port: '9756'
 
 # Data
 data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/']  # relative path to the binary data files
-data_train_view_files: ['hack/trainConfigs/short_40.txt']   # relative path to the train view file lists
+data_train_view_files: ['hack/trainConfigs/all.txt']   # relative path to the train view file lists
 data_num_retry: 10 # Maximum number of retries when  clip cannot be loaded
 data_samp_rate: 16000
 data_plot_max_limits: {}
@@ -35,6 +35,7 @@ data_transforms_1: [
     ['ExpandDim', {'dim': 0}] 
 ]
 data_transforms_2: [ 
+    ['SoxEffectTransform', {'effects': [['pitch', '5'], ['gain', '-n', '-3']]}],
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800}],
     ['ExpandDim', {'dim': 0}] 
   ]
