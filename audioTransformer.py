@@ -37,11 +37,19 @@ class AudioTransformer(object):
       if not found:
         self.logger.info("{} is not an Audio Transform - skipping".format(t))
     
+    self.logger.info("**** transforms: {} ".format(transforms))
     return nn.Sequential(*transforms)
 
   
   def __call__(self, x):
       y1 = self.transform_1(x)
+      
+      try:
+        self.logger.info("**** Audio transform signal shape{}".format(x.shape))
+        self.logger.info("**** audio transform signal dtype{}".format(x.dtype))
+      except:
+        print("**** couldn't print shape") 
+      
       y2 = self.transform_2(x)
       return y1, y2
 

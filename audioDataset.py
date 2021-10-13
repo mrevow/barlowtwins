@@ -47,8 +47,8 @@ class AudioDataset(torch.utils.data.Dataset):
         self.clipList = []
         for bin_path, view_file in zip(bin_paths, view_files):
             self.construct_loader(bin_path, view_file)
-        
-        
+
+
     def construct_loader(self, binPath, viewFile):
         pathToViewFile = createFullPathTree(self.args.root_dir, viewFile)
         assert os.path.exists(pathToViewFile), "View file {} does not exist".format(
