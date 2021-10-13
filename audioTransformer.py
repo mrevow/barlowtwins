@@ -37,6 +37,7 @@ class AudioTransformer(object):
       if not found:
         self.logger.info("{} is not an Audio Transform - skipping".format(t))
     
+    self.logger.info("Final Transforms: {} ".format(transforms))
     return nn.Sequential(*transforms)
 
   
@@ -44,5 +45,3 @@ class AudioTransformer(object):
       y1 = self.transform_1(x)
       y2 = self.transform_2(x)
       return y1, y2
-
-

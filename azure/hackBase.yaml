@@ -39,11 +39,13 @@ data_pad_duration: 10 # files short than data_pad_duration seconds will be zero 
 
 # Transforms must be one of torchAudio transforms - see https://pytorch.org/audio/stable/transforms.html
 # Each entry is a tuple [TransformName, arguments]
-data_transforms_1: [ 
+data_transforms_1: [
+    ['SoxEffectTransform', {'effects': [['pitch', '5'], ['gain', '-n']]}],
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
-  ]
+]
 data_transforms_2: [ 
+    ['SoxEffectTransform', {'effects': [['pitch', '5'], ['gain', '-n', '-3']]}],
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
   ]
