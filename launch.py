@@ -8,7 +8,10 @@ def launch_job(args, func, init_method=None, ):
     """
     Run 'func' on one or more GPUs, specified in cfg
     """
-    args.ngpus_per_node = torch.cuda.device_count()
+    args.ngpus_per_node = torch.cuda.device_count() if args.num_gpu is None else args.num_gpu
+    # sanity check
+    args.ngpus_per_node = min(args.ngpus_per_node, torch.cuda.device_count())
+    args.ngpus_per_node = max(0, args.ngpus_per_node)
     args.rank = 0
     args.world_size = max( args.ngpus_per_node, 1)
     if args.ngpus_per_node > 0:

@@ -2,7 +2,7 @@
 # 
 
 allow_reuse: False
-aml_compute_target: cpu-12Node-D11
+aml_compute_target: cpu-2node
 azure_config_path: Configs/
 azure_package_path: wheels_canary
 config_overwrite: True
@@ -22,4 +22,4 @@ template_prefix: tmp
 conda_pckg_expr:  'azureml-private-packages/barlow'
 setup_template: setup.py
 submitter_wait_delay_sec: 5
-workspace_config: azureConfig.json
+workspace_config: azureConfigTrain.json

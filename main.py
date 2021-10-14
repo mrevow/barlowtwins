@@ -23,7 +23,7 @@ import audioset_tagging_cnn.pytorch.models as audiosetModels
 
 # import torchvision.transforms as transforms
 
-from barlowtwins.audioTransformer import AudioTransformer
+from barlowtwins.audioTransformer import AudioTransformer, AudioTransformerBatch
 from barlowtwins.audioDataset import AudioDataset
 
 from common.utils.pathUtils import createFullPathTree, ensureDir, savePickle, loadPickle
@@ -143,7 +143,7 @@ def chooseBackbone(backbone_model, backbone_kwargs, logger):
     model = None
 
     if hasattr(audiosetModels, backbone_model):
-        model = getattr(audiosetModels, backbone_model)(**backbone_kwargs)
+        model = getattr(audiosetModels, backbone_model)(logger, **backbone_kwargs)
         lastLayerName = list(model.named_modules())[-1][0]
         lastLayersize = getattr(model, lastLayerName).out_features            
         logger.info("Found {} in audiosetModels".format(backbone_model))
@@ -166,12 +166,17 @@ def main_worker(args, logger, gpu):
     logger.info("Starting on Device {}".format(gpu))
 
     torch.backends.cudnn.benchmark = True
+    if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
+        batchTransforms = AudioTransformerBatch(args, logger)
+    else:
+        batchTransforms = None
 
     if torch.cuda.is_available():
-        model = BarlowTwins(args, logger).cuda(args.rank)
+        model = BarlowTwins(args, logger, batchTransforms).cuda(args.rank)
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        batchTransforms.convertToGpu(args.rank)
     else:
-        model =  BarlowTwins(args, logger)
+        model =  BarlowTwins(args, logger, batchTransforms)
 
     param_weights = []
     param_biases = []
@@ -182,7 +187,7 @@ def main_worker(args, logger, gpu):
             param_weights.append(param)
     parameters = [{'params': param_weights}, {'params': param_biases}]
     if torch.cuda.is_available():
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu],)
     optimizer = LARS(parameters, lr=0, weight_decay=args.weight_decay,
                     weight_decay_filter=True,
                     lars_adaptation_filter=True)
@@ -213,7 +218,7 @@ def main_worker(args, logger, gpu):
     for epoch in range(start_epoch, args.epochs):
         if torch.cuda.is_available():
             sampler.set_epoch(epoch)
-        for step, ((y1, y2), _, _) in enumerate(loader, start=epoch * len(loader)):
+        for step, ((y1, y2), _,idxs) in enumerate(loader, start=epoch * len(loader)):
             if torch.cuda.is_available():
                 y1 = y1.cuda(gpu, non_blocking=True)
                 y2 = y2.cuda(gpu, non_blocking=True)
@@ -221,6 +226,9 @@ def main_worker(args, logger, gpu):
             optimizer.zero_grad()
             with torch.cuda.amp.autocast():
                 loss = model.forward(y1, y2)
+
+            isNan = torch.isnan(loss)
+            assert not torch.all(isNan), "Hit Nan at step {} idxs {}".format(step, idxs)                
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -288,7 +296,7 @@ def off_diagonal(x):
 
 
 class BarlowTwins(nn.Module):
-    def __init__(self, args, logger):
+    def __init__(self, args, logger, batchTransforms):
         super().__init__()
         self.args = args
         self.logger = logger
@@ -320,9 +328,14 @@ class BarlowTwins(nn.Module):
 
         self.logger.info("Created BarlowTwins using backbone {}".format(self.args.backbone_model))
         self.logger.debug(self)
+        self.batchTransforms = batchTransforms
 
     def forward(self, y1, y2):
-        z1 = self.projector(self.backbone(y1))
+        if self.batchTransforms is not None:
+            y1, y2 = self.batchTransforms(y1, y2)
+        
+        y1 = self.backbone(y1)
+        z1 = self.projector(y1)
         z2 = self.projector(self.backbone(y2))
 
         # empirical cross-correlation matrix
