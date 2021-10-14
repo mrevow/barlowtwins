@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 from torchaudio import transforms as torchAudioTransforms 
 import barlowtwins.audioTransforms as localTransforms
 
@@ -67,6 +68,21 @@ class AudioTransformerBatch(AudioTransformer):
     self.transform_2 = self.createTransforms(self.args.data_batch_transforms_2)
 
   def __call__(self, x1, x2):
-      y1 = self.transform_1(x1)
-      y2 = self.transform_2(x2)
-      return y1, y2
+    y1 = self.transform_1(x1)
+    y2 = self.transform_2(x2)
+    return y1, y2
+
+  def _convertToGpu(self, gpu, inTransforms):
+    transforms = []
+    for t in inTransforms:
+      t.cuda(gpu)
+      t = nn.SyncBatchNorm.convert_sync_batchnorm(t)
+      t = torch.nn.parallel.DistributedDataParallel(t, device_ids=[gpu])
+      transforms.append(t)
+
+    self.logger.info("Final batch Transforms: {} ".format(transforms))
+    return nn.Sequential(*transforms)
+
+  def convertToGpu(self, gpu):
+    self.transform_1 = self._convertToGpu(gpu, self.transform_1)
+    self.transform_2 = self._convertToGpu(gpu, self.transform_2)

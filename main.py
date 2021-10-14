@@ -166,12 +166,17 @@ def main_worker(args, logger, gpu):
     logger.info("Starting on Device {}".format(gpu))
 
     torch.backends.cudnn.benchmark = True
+    if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
+        batchTransforms = AudioTransformerBatch(args, logger)
+    else:
+        batchTransforms = None
 
     if torch.cuda.is_available():
-        model = BarlowTwins(args, logger).cuda(args.rank)
+        model = BarlowTwins(args, logger, batchTransforms).cuda(args.rank)
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        batchTransforms.convertToGpu(args.rank)
     else:
-        model =  BarlowTwins(args, logger)
+        model =  BarlowTwins(args, logger, batchTransforms)
 
     param_weights = []
     param_biases = []
@@ -182,7 +187,7 @@ def main_worker(args, logger, gpu):
             param_weights.append(param)
     parameters = [{'params': param_weights}, {'params': param_biases}]
     if torch.cuda.is_available():
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu], find_unused_parameters=True)
     optimizer = LARS(parameters, lr=0, weight_decay=args.weight_decay,
                     weight_decay_filter=True,
                     lars_adaptation_filter=True)
@@ -291,7 +296,7 @@ def off_diagonal(x):
 
 
 class BarlowTwins(nn.Module):
-    def __init__(self, args, logger):
+    def __init__(self, args, logger, batchTransforms):
         super().__init__()
         self.args = args
         self.logger = logger
@@ -300,6 +305,7 @@ class BarlowTwins(nn.Module):
         self.lastLayerSize = lastLayerSize
         self.lastLayerName = lastLayerName
         
+        self.bn0 = nn.BatchNorm2d(64)
         # self.backbone = torchvision.models.resnet50(zero_init_residual=True)
         
         # Update the native resNet for audio (single input channel)
@@ -323,16 +329,12 @@ class BarlowTwins(nn.Module):
 
         self.logger.info("Created BarlowTwins using backbone {}".format(self.args.backbone_model))
         self.logger.debug(self)
-
-        if self.args.data_batch_transforms_1 is not None and self.args.data_batch_transforms_2 is not None:
-            self.batchTransforms = AudioTransformerBatch(self.args, self.logger)
-        else:
-            self.batchTransforms = None
+        self.batchTransforms = batchTransforms
 
     def forward(self, y1, y2):
         if self.batchTransforms is not None:
             y1, y2 = self.batchTransforms(y1, y2)
-
+        
         y1 = self.backbone(y1)
         z1 = self.projector(y1)
         z2 = self.projector(self.backbone(y2))
