@@ -21,7 +21,6 @@ backbone_kwargs: [{ "zero_init_residual": True}]
 checkpoint_name: ""
 learning_rate: 0.0001
 
-
 data_transforms_1: [
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
