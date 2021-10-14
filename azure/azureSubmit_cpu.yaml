@@ -6,7 +6,7 @@ aml_compute_target: cpu-12Node-D11
 azure_config_path: Configs/
 azure_package_path: wheels_canary
 config_overwrite: True
-azure_script: run.py
+azure_script: runHack.py
 conda_environment: vqm_environment_cpu.yaml
 datastore: audiopstndata
 datastore_fileStorage: audio_dataset

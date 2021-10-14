@@ -7,6 +7,7 @@ config_file_delete_on_exit: True
 operations: [train_unsupervised] # train_unsupervised | train_supervised | eval_unsupervised
 
 workers: 8
+num_gpu: !!null   # Number of gpus to use None means use all available
 epochs: 1000
 batch_size: 2048
 learning_rate_weights: 0.2

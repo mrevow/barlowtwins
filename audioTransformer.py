@@ -16,6 +16,7 @@ class AudioTransformer(object):
     self.args = args
     self.logger = logger
 
+    self.logger.info("Creating sample transforms")
     self.transform_1 = self.createTransforms(self.args.data_transforms_1)
     self.transform_2 = self.createTransforms(self.args.data_transforms_2)
 
@@ -44,4 +45,28 @@ class AudioTransformer(object):
   def __call__(self, x):
       y1 = self.transform_1(x)
       y2 = self.transform_2(x)
+      return y1, y2
+
+
+class AudioTransformerBatch(AudioTransformer):
+  '''
+  Creates transformers for the BarlowTwins network that run on the data batch before it is
+  fed to the backbone. Behaves same as AudioTransformer
+  The transforms are specified in the .yaml file using data_batch_transforms_1 and data_batch_transforms_2
+  Each is an array of tuples:
+    [name, arguments]
+  name is the transform name. Can be either a totch audio transform or one found in audioTransforms.py
+  arguments is a dict of argName: value  that will be accepted by the transform
+  '''
+  def __init__(self, args, logger):
+    self.args = args
+    self.logger = logger
+
+    self.logger.info("Creating batch transforms")
+    self.transform_1 = self.createTransforms(self.args.data_batch_transforms_1)
+    self.transform_2 = self.createTransforms(self.args.data_batch_transforms_2)
+
+  def __call__(self, x1, x2):
+      y1 = self.transform_1(x1)
+      y2 = self.transform_2(x2)
       return y1, y2
