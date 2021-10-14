@@ -12,7 +12,7 @@ import torch
 
 from barlowtwins.main import BarlowTwins
 from barlowtwins.audioDataset import AudioDataset
-from barlowtwins.audioTransformer import AudioTransformer
+from barlowtwins.audioTransformer import AudioTransformer, AudioTransformerBatch
 
 # from common.utils.pathUtils import createFullPathTree, ensureDir, savePickle, loadPickle
 from common.utils.logger import CreateLogger
@@ -72,7 +72,13 @@ class MusicClassifier(object):
 
 
 def train(args, logger):
-    model =  musicClassifier(args, logger)
+
+    if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
+        batchTransforms = AudioTransformerBatch(args, logger)
+    else:
+        batchTransforms = None
+
+    model =  musicClassifier(args, logger, batchTransforms)
     logger.info('Loaded music classifier model')
     logger.debug(model)
 
@@ -249,11 +255,11 @@ class EarlyStopper(object):
 
 
 class musicClassifier(nn.Module):
-    def __init__(self, args, logger):
+    def __init__(self, args, logger, batchTransforms):
         super().__init__()
         self.args = args
         
-        barlow_model = BarlowTwins(self.args, logger)
+        barlow_model = BarlowTwins(self.args, logger, batchTransforms=batchTransforms)
         self.backbone = nn.Sequential(
             barlow_model.backbone,
             nn.Linear(barlow_model.lastLayerSize, 1, bias=True)
