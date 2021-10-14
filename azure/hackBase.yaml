@@ -52,3 +52,10 @@ data_transforms_2: [
     ['ExpandDim', {'dim': 0}] 
   ]
 
+# These transforms take place on the batch data sent to the Barlow model
+data_batch_transforms_1: [
+    ['NormalizeInputBatch', {'chanCount': 64, 'transpose': [1, 2]}] 
+  ]
+data_batch_transforms_2: [
+    ['NormalizeInputBatch', {'chanCount': 64, 'transpose': [1, 2]}] 
+  ]

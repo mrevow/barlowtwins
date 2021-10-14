@@ -27,9 +27,3 @@ data_transforms_2: [
     ['ExpandDim', {'dim': 0}],
   ]
 
-data_batch_transforms_1: [
-    ['NormalizeInputBatch', {'chanCount': 64, 'transpose': [1, 2]}] 
-  ]
-data_batch_transforms_2: [
-    ['NormalizeInputBatch', {'chanCount': 64, 'transpose': [1, 2]}] 
-  ]
