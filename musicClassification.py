@@ -58,7 +58,7 @@ class MusicClassifier(object):
         with CreateLogger(self.args, logger_type=self.args.logger_type) as logger:
             self.logger = logger
             self.loggerWorkaroundAll()
-            self.args.checkpoint_dir = Path(self.args.output_dir)
+            self.args.checkpoint_dir = Path(self.args.root_dir)
 
             train(self.args, logger)
 
@@ -66,7 +66,7 @@ class MusicClassifier(object):
         with CreateLogger(self.args, logger_type=self.args.logger_type) as logger:
             self.logger = logger
             self.loggerWorkaroundAll()
-            self.args.checkpoint_dir = Path(self.args.output_dir)
+            self.args.checkpoint_dir = Path(self.args.root_dir)
 
             eval_validation_set(self.args, logger)
 
