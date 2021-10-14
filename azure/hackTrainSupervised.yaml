@@ -15,11 +15,13 @@ operations: [train_supervised]
 debug: True
 
 # To use a torchvision Net
-backbone_model: resnet50
-backbone_kwargs: [{ "zero_init_residual": True}]
+# backbone_model: resnet50
+# backbone_kwargs: [{ "zero_init_residual": True}]
+
+backbone_model: Cnn6
 
 checkpoint_name: ""
-learning_rate: 0.0001
+learning_rate: 0.001
 
 data_transforms_1: [
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
