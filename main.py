@@ -144,22 +144,21 @@ def chooseBackbone(backbone_model, backbone_kwargs, logger):
 
     if hasattr(audiosetModels, backbone_model):
         model = getattr(audiosetModels, backbone_model)(**backbone_kwargs)
-        # audio models have uniform upper layers - fiddel these for the barlow environment
-        lastLayersize = model.fc1.out_features
-        lastLayerName = 'fc1'
+        lastLayerName = list(model.named_modules())[-1][0]
+        lastLayersize = getattr(model, lastLayerName).out_features            
         logger.info("Found {} in audiosetModels".format(backbone_model))
 
     # Check if it is a torchvision model - they require some fiddling
     if model is None and  hasattr(torchvisionModels, backbone_model):
         model = getattr(torchvisionModels, backbone_model)(**backbone_kwargs)
+        lastLayerName = list(model.named_modules())[-1][0]
+        lastLayersize = getattr(model, lastLayerName).in_features    
         # Vision model have uniform structure just need to fiddle it for audio
         model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         nn.init.kaiming_normal_(model.conv1.weight, mode='fan_out', nonlinearity='relu')
-        lastLayersize = model.fc.in_features
-        lastLayerName = 'fc'
         model.fc = nn.Identity()
         logger.info("Found {} in torchvisionModels".format(backbone_model))
-        
+
     assert model is not None, "Cannot find an implementation for backbone model {}".format(backbone_model)
     return model, lastLayersize, lastLayerName
 

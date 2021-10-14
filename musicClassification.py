@@ -73,7 +73,7 @@ class MusicClassifier(object):
 
 def train(args, logger):
     model =  musicClassifier(args, logger)
-    logger.info('loaded music classifier model')
+    logger.info('Loaded music classifier model')
     logger.debug(model)
 
     # train on gpu if available
@@ -100,12 +100,12 @@ def train(args, logger):
         )
 
     # prepare for training
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     criterion = nn.BCELoss()
     early_stopper = EarlyStopper(args)
 
     start_time = time.time()
-    logger.info('start training ..')
+    logger.info('Start training ..')
     for epoch in range(0, args.epochs):
         for step, ((x1, _), y1, _) in enumerate(loader_train, start=epoch * len(loader_train)):
             y1 = y1.type(torch.float).to(dev)
@@ -132,7 +132,7 @@ def train(args, logger):
         if (epoch % args.data_epoch_checkpoint_freq) == 0:
 
             results = evaluate(model, loader_val, dev)
-            logger.info('epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
+            logger.info('Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
             logger.log_row(name='accuracy', epoch=epoch, accuracy=results['accuracy'])
             logger.log_row(name='recall', epoch=epoch, accuracy=results['recall'])
             logger.log_row(name='precision', epoch=epoch, accuracy=results['precision'])
@@ -143,7 +143,8 @@ def train(args, logger):
                 state = dict(epoch=epoch + 1, model=statedict,
                             optimizer=optimizer.state_dict())
                 torch.save(state, args.checkpoint_dir / 'best_checkpoint.pth')
-                logger.info('checkpoint saved')
+                logger.info('Checkpoint saved')
+                logger.log_value(name='best_accuracy', value=results['accuracy'])
 
             # stop early if validation accuracy does not improve
             stop_early = early_stopper.step(results['accuracy'], epoch+1)
@@ -153,7 +154,7 @@ def train(args, logger):
 
 def eval_validation_set(args, logger):
     model =  musicClassifier(args, logger)
-    logger.info('loaded music classifier model')
+    logger.info('Loaded music classifier model')
     logger.debug(model)
 
     # run on gpu if available
@@ -171,9 +172,9 @@ def eval_validation_set(args, logger):
         shuffle=False,
         drop_last=False,
         )
-    logger.info('start evaluating ..')
+    logger.info('Start evaluating ..')
     results = evaluate(model, loader_val, dev)
-    logger.info('accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
+    logger.info('Accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
     return results
 
 
@@ -189,9 +190,9 @@ def load_checkpoint(args, logger, model):
         for unexpected_key in unexpected_keys:
             if not ((unexpected_key.startswith('bn.')) or (unexpected_key.startswith('projector.'))):
                 raise ValueError('Found unexpected keys in checkpoint {}'.format(unexpected_keys))        
-        logger.info('checkpoint loaded from {}'.format(args.checkpoint_dir / args.checkpoint_name))
+        logger.info('Checkpoint loaded from {}'.format(args.checkpoint_dir / args.checkpoint_name))
     else:
-        logger.info('no checkpoint loaded')
+        logger.info('No checkpoint loaded')
     return model
 
 
@@ -201,12 +202,12 @@ def get_device(logger, model):
         model.to(dev)
         if torch.cuda.device_count()>1:
             model = torch.nn.parallel.DataParallel(model)
-            logger.info('train on cude with data parallel on {} devices'.format(torch.cuda.device_count()))
+            logger.info('Train on gpu with data parallel on {} devices'.format(torch.cuda.device_count()))
         else:
-            logger.info('train on cude without data parallel')
+            logger.info('Train on gpu without data parallel')
     else:
         dev = torch.device("cpu")
-        logger.info('train on cpu')
+        logger.info('Train on cpu')
     return dev, model
 
 
@@ -253,14 +254,10 @@ class musicClassifier(nn.Module):
         self.args = args
         
         barlow_model = BarlowTwins(self.args, logger)
-        self.backbone = barlow_model.backbone
-
-        if barlow_model.lastLayerName == 'fc1':
-            self.backbone.fc1 = nn.Linear(barlow_model.lastLayerSize, 1, bias=True)
-        elif barlow_model.lastLayerName == 'fc':
-            self.backbone.fc = nn.Linear(barlow_model.lastLayerSize, 1, bias=True)
-        else:
-            raise ValueError('Last layer name {} unkown'.format(barlow_model.lastLayerName))
+        self.backbone = nn.Sequential(
+            barlow_model.backbone,
+            nn.Linear(barlow_model.lastLayerSize, 1, bias=True)
+        )
 
     def forward(self, x):
         x = self.backbone(x)
