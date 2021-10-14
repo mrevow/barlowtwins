@@ -5,10 +5,10 @@ data_val_bin_path: ['hack/music-detection-data/sl_training_set_v1/']  # relative
 data_val_view_files: ['hack/trainConfigs/supervised_val_v02.txt']   # relative path to the train view file lists
 
 epochs: 10000
-batch_size: 2048
+batch_size: 2000
 workers: 8
 data_epoch_checkpoint_freq: 1
-early_stop_patience: 10
+early_stop_patience: 20
 print_freq: 1
 plot_freq: 1
 operations: [train_supervised]
@@ -19,3 +19,13 @@ backbone_model: resnet50
 backbone_kwargs: [{ "zero_init_residual": True}]
 
 checkpoint_name: ""
+learning_rate: 0.0001
+
+data_transforms_1: [
+    ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
+    ['ExpandDim', {'dim': 0}] 
+]
+data_transforms_2: [ 
+    ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
+    ['ExpandDim', {'dim': 0}] 
+  ]
