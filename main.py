@@ -187,7 +187,7 @@ def main_worker(args, logger, gpu):
             param_weights.append(param)
     parameters = [{'params': param_weights}, {'params': param_biases}]
     if torch.cuda.is_available():
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu],)
     optimizer = LARS(parameters, lr=0, weight_decay=args.weight_decay,
                     weight_decay_filter=True,
                     lars_adaptation_filter=True)
@@ -305,7 +305,6 @@ class BarlowTwins(nn.Module):
         self.lastLayerSize = lastLayerSize
         self.lastLayerName = lastLayerName
         
-        self.bn0 = nn.BatchNorm2d(64)
         # self.backbone = torchvision.models.resnet50(zero_init_residual=True)
         
         # Update the native resNet for audio (single input channel)
