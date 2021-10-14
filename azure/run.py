@@ -70,7 +70,6 @@ def main():
         logger.info("MASTER_ADDR {} MASTER_PORT {} WORLD_SIZE {}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"], os.environ["WORLD_SIZE"]))
         
         logger.tag(name='backbone_model', value=args.backbone_model)
-
         for op in args.operations: 
           if op =='train_unsupervised':
             logger.tag(name='operation', value=op)
@@ -79,6 +78,7 @@ def main():
 
           elif op =='train_supervised':
             logger.tag(name='operation', value=op)
+            logger.tag(name='lr', value=args.learning_rate)
             musicClassifier = MusicClassifier(args)
             musicClassifier.train()
 

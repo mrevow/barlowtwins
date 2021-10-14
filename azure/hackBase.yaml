@@ -23,7 +23,7 @@ backend: nccl
 master_port: '9756'
 backbone_model: Cnn6
 backbone_kwargs: [{'sample_rate': 16000, 'window_size': 1024, 'hop_size': 800, 'mel_bins': 64, 'fmin': 0, 'fmax': 8000, 'classes_num': 2 }]
-
+learning_rate: 0.0001 # learning rate for supervised training
 
 # Data
 data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/']  # relative path to the binary data files
