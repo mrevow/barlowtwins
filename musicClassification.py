@@ -111,7 +111,7 @@ def train(args, logger):
     early_stopper = EarlyStopper(args)
 
     start_time = time.time()
-    logger.info('Start musicClassifier training ..')
+    logger.info('Start musicClassifier training for {} epochs'.format(args.music_classifier_epochs))
     for epoch in range(0, args.music_classifier_epochs):
         for step, ((x1, _), y1, _) in enumerate(loader_train, start=epoch * len(loader_train)):
             y1 = y1.type(torch.float).to(dev)
@@ -191,7 +191,7 @@ def eval_validation_set(args, logger):
         shuffle=False,
         drop_last=False,
         )
-    logger.info('Start evaluating ..')
+    logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_val)))
     results = evaluate(model, loader_val, dev)
     logger.info('Accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
     return results
@@ -274,6 +274,7 @@ class musicClassifier(nn.Module):
         
         barlow_model = BarlowTwins(self.args, logger, batchTransforms=batchTransforms)
         self.backbone = barlow_model.backbone
+        self.batchTransforms = batchTransforms
         self.classHead = nn.Linear(barlow_model.lastLayerSize, 1, bias=True)        
 
     def forward(self, x):
