@@ -68,7 +68,7 @@ class MusicClassifier(object):
             self.loggerWorkaroundAll()
             self.args.checkpoint_dir = Path(self.args.output_dir)
 
-            eval_validation_set(self.args, logger)
+            eval_test_set(self.args, logger)
 
 
 def train(args, logger):
@@ -82,15 +82,15 @@ def train(args, logger):
     logger.info('Loaded music classifier model')
     logger.debug(model)
 
-    # train on gpu if available
-    dev, model = get_device(logger, model)
-
     # automatically resume from checkpoint if it exists
     model = load_checkpoint(args, logger, model, args.checkpoint_name)
 
+    # train on gpu if available
+    dev, model = get_device(logger, model)
+
     # load datasets
-    dataset_train = AudioDataset(args=args, logger=logger, mode='suptrain', transform=AudioTransformer(args, logger))
-    dataset_val = AudioDataset(args=args, logger=logger, mode='supval', transform=AudioTransformer(args, logger))
+    dataset_train = AudioDataset(args=args, logger=logger, mode='suptrain', transform=AudioTransformer(args, logger, supervised=True))
+    dataset_val = AudioDataset(args=args, logger=logger, mode='supval', transform=AudioTransformer(args, logger,  supervised=True))
     sampler_train = torch.utils.data.RandomSampler(dataset_train)
     loader_train = torch.utils.data.DataLoader(
         dataset_train, 
@@ -106,7 +106,7 @@ def train(args, logger):
         )
 
     # prepare for training
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=args.music_classifier_learning_rate)
     criterion = nn.BCELoss()
     early_stopper = EarlyStopper(args)
 
@@ -165,7 +165,7 @@ def train(args, logger):
         torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
 
 
-def eval_validation_set(args, logger):
+def eval_test_set(args, logger):
     logger.info("Start musicClassifier supervised evaluation")
     if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
         batchTransforms = AudioTransformerBatch(args, logger)
@@ -176,14 +176,14 @@ def eval_validation_set(args, logger):
     logger.info('Loaded music classifier model')
     logger.debug(model)
 
-    # run on gpu if available
-    dev, model = get_device(logger, model)
-
     # load checkpoint
     model = load_checkpoint(args, logger, model, args.music_classifier_checkpoint_name)
 
+    # run on gpu if available
+    dev, model = get_device(logger, model)
+
     # load datasets
-    dataset_val = AudioDataset(args=args, logger=logger, mode='suptest', transform=AudioTransformer(args, logger))
+    dataset_val = AudioDataset(args=args, logger=logger, mode='suptest', transform=AudioTransformer(args, logger, supervised=True))
     loader_val = torch.utils.data.DataLoader(
         dataset_val, 
         batch_size=args.batch_size, 
@@ -250,6 +250,7 @@ def evaluate(model, loader, dev):
         model.eval()
         with torch.no_grad():
             yy = [ [model(x1.to(dev)).cpu().numpy()>0.5, y1.cpu().numpy()] for ((x1, _), y1, _) in loader]
+        model.train()
         yy = np.concatenate( yy, axis=1 )
         y_pred = yy[0,:].reshape(-1,1)
         y_true = yy[1,:].reshape(-1,1)
