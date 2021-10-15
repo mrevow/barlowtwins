@@ -193,11 +193,14 @@ def main_worker(args, logger, gpu):
                     lars_adaptation_filter=True)
 
     # automatically resume from checkpoint if it exists
-    if (args.checkpoint_dir / 'checkpoint.pth').is_file():
-        ckpt = torch.load(args.checkpoint_dir / 'checkpoint.pth',
+    if (args.checkpoint_dir / args.checkpoint_name ).is_file():
+        ckpt = torch.load(args.checkpoint_dir /  args.checkpoint_name,
                         map_location='cpu')
         start_epoch = ckpt['epoch']
-        model.load_state_dict(ckpt['model'])
+        if torch.cuda.is_available():
+             model.module.load_state_dict(ckpt['model'])
+        else:
+            model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
     else:
         start_epoch = 0
@@ -256,12 +259,13 @@ def main_worker(args, logger, gpu):
             statedict = model.module.state_dict() if torch.cuda.is_available() else model.state_dict()
             state = dict(epoch=epoch + 1, model=statedict,
                         optimizer=optimizer.state_dict())
-            torch.save(state, args.checkpoint_dir / 'checkpoint.pth')
+            torch.save(state, args.checkpoint_dir / args.checkpoint_name)
     if args.rank == 0:
         # save final model
         statedict = model.module.backbone.state_dict() if torch.cuda.is_available() else model.backbone.state_dict()
+        chk = args.backbone_model + '.pth'
         torch.save(statedict,
-                args.checkpoint_dir / 'resnet50.pth')
+                args.checkpoint_dir / chk)
 
 
 def adjust_learning_rate(args, optimizer, loader, step):
