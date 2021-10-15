@@ -163,7 +163,7 @@ def chooseBackbone(backbone_model, backbone_kwargs, logger):
     return model, lastLayersize, lastLayerName
 
 def main_worker(args, logger, gpu):
-    logger.info("Starting on Device {}".format(gpu))
+    logger.info("Starting unsupervised training on Device {}".format(gpu))
 
     torch.backends.cudnn.benchmark = True
     if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
@@ -225,7 +225,7 @@ def main_worker(args, logger, gpu):
             adjust_learning_rate(args, optimizer, loader, step)
             optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                loss = model.forward(y1, y2)
+                loss, on_diag, off_diag = model.forward(y1, y2)
 
             isNan = torch.isnan(loss)
             assert not torch.all(isNan), "Hit Nan at step {} idxs {}".format(step, idxs)                
@@ -238,9 +238,10 @@ def main_worker(args, logger, gpu):
                                 lr_weights=optimizer.param_groups[0]['lr'],
                                 lr_biases=optimizer.param_groups[1]['lr'],
                                 loss=loss.item(),
+                                on_diag=on_diag.item(),
+                                off_diag=off_diag.item()
                                 )
-                    ite = step + epoch * len(dataset)
-                    plotStats(args, logger, stats, ite, 'TrainIter')
+                    plotStats(args, logger, stats, step, 'TrainIter')
 
             if step % args.print_freq == 0:
                 if args.rank == 0:
@@ -296,7 +297,7 @@ def off_diagonal(x):
 
 
 class BarlowTwins(nn.Module):
-    def __init__(self, args, logger, batchTransforms):
+    def __init__(self, args, logger, batchTransforms=None):
         super().__init__()
         self.args = args
         self.logger = logger
@@ -349,7 +350,7 @@ class BarlowTwins(nn.Module):
         on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
         off_diag = off_diagonal(c).pow_(2).sum()
         loss = on_diag + self.args.lambd * off_diag
-        return loss
+        return loss, on_diag, off_diag
 
 
 class LARS(optim.Optimizer):

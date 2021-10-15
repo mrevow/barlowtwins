@@ -58,7 +58,7 @@ class MusicClassifier(object):
         with CreateLogger(self.args, logger_type=self.args.logger_type) as logger:
             self.logger = logger
             self.loggerWorkaroundAll()
-            self.args.checkpoint_dir = Path(self.args.root_dir)
+            self.args.checkpoint_dir = Path(self.args.output_dir)
 
             train(self.args, logger)
 
@@ -66,13 +66,13 @@ class MusicClassifier(object):
         with CreateLogger(self.args, logger_type=self.args.logger_type) as logger:
             self.logger = logger
             self.loggerWorkaroundAll()
-            self.args.checkpoint_dir = Path(self.args.root_dir)
+            self.args.checkpoint_dir = Path(self.args.output_dir)
 
             eval_validation_set(self.args, logger)
 
 
 def train(args, logger):
-
+    logger.info("Start Supervised training")
     if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
         batchTransforms = AudioTransformerBatch(args, logger)
     else:
@@ -86,11 +86,11 @@ def train(args, logger):
     dev, model = get_device(logger, model)
 
     # automatically resume from checkpoint if it exists
-    model = load_checkpoint(args, logger, model)
+    model = load_checkpoint(args, logger, model, args.checkpoint_name)
 
     # load datasets
-    dataset_train = AudioDataset(args=args, logger=logger, mode='train', transform=AudioTransformer(args, logger))
-    dataset_val = AudioDataset(args=args, logger=logger, mode='val', transform=AudioTransformer(args, logger))
+    dataset_train = AudioDataset(args=args, logger=logger, mode='suptrain', transform=AudioTransformer(args, logger))
+    dataset_val = AudioDataset(args=args, logger=logger, mode='supval', transform=AudioTransformer(args, logger))
     sampler_train = torch.utils.data.RandomSampler(dataset_train)
     loader_train = torch.utils.data.DataLoader(
         dataset_train, 
@@ -111,8 +111,8 @@ def train(args, logger):
     early_stopper = EarlyStopper(args)
 
     start_time = time.time()
-    logger.info('Start training ..')
-    for epoch in range(0, args.epochs):
+    logger.info('Start musicClassifiertraining ..')
+    for epoch in range(0, args.music_classifier_epochs):
         for step, ((x1, _), y1, _) in enumerate(loader_train, start=epoch * len(loader_train)):
             y1 = y1.type(torch.float).to(dev)
             x1 = x1.to(dev)
@@ -148,7 +148,7 @@ def train(args, logger):
                 statedict = model.module.state_dict() if (torch.cuda.device_count()>1) else model.state_dict()
                 state = dict(epoch=epoch + 1, model=statedict,
                             optimizer=optimizer.state_dict())
-                torch.save(state, args.checkpoint_dir / 'best_checkpoint.pth')
+                torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
                 logger.info('Checkpoint saved')
                 logger.log_value(name='best_accuracy', value=results['accuracy'])
 
@@ -157,8 +157,16 @@ def train(args, logger):
             if stop_early:
                 return
 
+    if not (args.checkpoint_dir /  args.music_classifier_checkpoint_name).is_file():
+        # Save the last iteration as checkpoint if nothing exists
+        statedict = model.module.state_dict() if (torch.cuda.device_count()>1) else model.state_dict()
+        state = dict(epoch=epoch + 1, model=statedict,
+                    optimizer=optimizer.state_dict())
+        torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
+
 
 def eval_validation_set(args, logger):
+    logger.info("Start musicClassifier supervised evaluation")
     model =  musicClassifier(args, logger)
     logger.info('Loaded music classifier model')
     logger.debug(model)
@@ -167,10 +175,10 @@ def eval_validation_set(args, logger):
     dev, model = get_device(logger, model)
 
     # load checkpoint
-    model = load_checkpoint(args, logger, model)
+    model = load_checkpoint(args, logger, model, args.music_classifier_checkpoint_name)
 
     # load datasets
-    dataset_val = AudioDataset(args=args, logger=logger, mode='val', transform=AudioTransformer(args, logger))
+    dataset_val = AudioDataset(args=args, logger=logger, mode='suptest', transform=AudioTransformer(args, logger))
     loader_val = torch.utils.data.DataLoader(
         dataset_val, 
         batch_size=args.batch_size, 
@@ -184,19 +192,19 @@ def eval_validation_set(args, logger):
     return results
 
 
-def load_checkpoint(args, logger, model):
+def load_checkpoint(args, logger, model, checkpoint_name):
     # automatically resume from checkpoint if it exists
-    if (args.checkpoint_dir / args.checkpoint_name).is_file():
-        ckpt = torch.load(args.checkpoint_dir / args.checkpoint_name,
+    if (args.checkpoint_dir /checkpoint_name).is_file():
+        ckpt = torch.load(args.checkpoint_dir / checkpoint_name,
                         map_location='cpu')
         [missing_keys, unexpected_keys ] = model.load_state_dict(ckpt['model'], strict=False)
         for missed_key in missing_keys:
-            if not missed_key.startswith('backbone.fc'):
+            if not (missed_key.startswith('backbone.fc') or missed_key.startswith('classHead')):
                 raise ValueError('Found missing keys in checkpoint {}'.format(missing_keys))
         for unexpected_key in unexpected_keys:
             if not ((unexpected_key.startswith('bn.')) or (unexpected_key.startswith('projector.'))):
                 raise ValueError('Found unexpected keys in checkpoint {}'.format(unexpected_keys))        
-        logger.info('Checkpoint loaded from {}'.format(args.checkpoint_dir / args.checkpoint_name))
+        logger.info('Checkpoint loaded from {}'.format(args.checkpoint_dir / checkpoint_name))
     else:
         logger.info('No checkpoint loaded')
     return model
@@ -260,13 +268,17 @@ class musicClassifier(nn.Module):
         self.args = args
         
         barlow_model = BarlowTwins(self.args, logger, batchTransforms=batchTransforms)
-        self.backbone = nn.Sequential(
-            barlow_model.backbone,
-            nn.Linear(barlow_model.lastLayerSize, 1, bias=True)
-        )
+        self.backbone = barlow_model.backbone
+        self.classHead = nn.Linear(barlow_model.lastLayerSize, 1, bias=True)        
 
     def forward(self, x):
-        x = self.backbone(x)
+        if self.args.music_classifier_freeze_backbone:
+            with torch.no_grad():
+                x = self.backbone(x)
+        else:
+            x = self.backbone(x)
+
+        x = self.classHead(x)
         x = torch.sigmoid(x).view(-1)
         return x
 
