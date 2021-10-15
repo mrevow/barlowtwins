@@ -13,14 +13,18 @@ class AudioTransformer(nn.Module):
   name is the transform name. Can be either a totch audio transform or one found in audioTransforms.py
   arguments is a dict of argName: value  that will be accepted by the transform
   '''
-  def __init__(self, args, logger):
+  def __init__(self, args, logger, supervised=False):
     super().__init__()
     self.args = args
     self.logger = logger
 
     self.logger.info("Creating sample transforms")
-    self.transform_1 = self.createTransforms(self.args.data_transforms_1)
-    self.transform_2 = self.createTransforms(self.args.data_transforms_2)
+    if supervised:
+      self.transform_1 = self.createTransforms(self.args.sup_data_transforms)
+      self.transform_2 = self.createTransforms(self.args.sup_data_transforms)
+    else:      
+      self.transform_1 = self.createTransforms(self.args.data_transforms_1)
+      self.transform_2 = self.createTransforms(self.args.data_transforms_2)
 
   def createTransforms(self, transformSpec):
     '''
