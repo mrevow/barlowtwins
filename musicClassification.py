@@ -111,7 +111,7 @@ def train(args, logger):
     early_stopper = EarlyStopper(args)
 
     start_time = time.time()
-    logger.info('Start musicClassifiertraining ..')
+    logger.info('Start musicClassifier training ..')
     for epoch in range(0, args.music_classifier_epochs):
         for step, ((x1, _), y1, _) in enumerate(loader_train, start=epoch * len(loader_train)):
             y1 = y1.type(torch.float).to(dev)
@@ -167,7 +167,12 @@ def train(args, logger):
 
 def eval_validation_set(args, logger):
     logger.info("Start musicClassifier supervised evaluation")
-    model =  musicClassifier(args, logger)
+    if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
+        batchTransforms = AudioTransformerBatch(args, logger)
+    else:
+        batchTransforms = None
+
+    model =  musicClassifier(args, logger, batchTransforms)
     logger.info('Loaded music classifier model')
     logger.debug(model)
 
