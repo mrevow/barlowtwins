@@ -5,7 +5,7 @@ import barlowtwins.audioTransforms as localTransforms
 import librosa
 import os
 
-class AudioTransformer(object):
+class AudioTransformer(nn.Module):
   '''
   Creates transformers for the BarlowTwins network.
   An input audio tensor is transformed twice for each pathway in the network
@@ -16,6 +16,7 @@ class AudioTransformer(object):
   arguments is a dict of argName: value  that will be accepted by the transform
   '''
   def __init__(self, args, logger):
+    super().__init__()
     self.args = args
     self.logger = logger
 
@@ -91,6 +92,7 @@ class AudioTransformerBatch(AudioTransformer):
   arguments is a dict of argName: value  that will be accepted by the transform
   '''
   def __init__(self, args, logger):
+    super().__init__(args, logger)
     self.args = args
     self.logger = logger
 

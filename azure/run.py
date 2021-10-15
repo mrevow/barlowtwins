@@ -88,7 +88,7 @@ def main():
             musicClassifier.eval()
 
           else:
-            raise ValueError('operation {} not found'.format(op))
+            raise ValueError('operation {} not found expect one of [train_unsupervised, train_supervised, eval_supervised'.format(op))
 
 if __name__ == "__main__":
   main()
