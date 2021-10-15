@@ -49,7 +49,7 @@ class LibrPitch(nn.Module):
     x = lb.effects.pitch_shift(x.numpy(), sr=self.sr, n_steps=shift)
     return torch.tensor(x)
 
-###################### Batch Transofrms #################################
+###################### Batch Transforms #################################
 class NormalizeInputBatch(nn.Module):
   def __init__(self, chanCount, transpose=None, biasInit=0.0, weightinit=1.0):
     '''

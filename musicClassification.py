@@ -196,19 +196,32 @@ def eval_validation_set(args, logger):
     logger.info('Accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
     return results
 
+def updateCheckPointKeys(chkPoint, subs="module."):
+    keys = list(chkPoint.keys())
+    for k in keys:
+        if subs in k:
+            kNew = k.replace(subs, "")
+            chkPoint[kNew] = chkPoint[k]
+            del chkPoint[k]
+
+    return chkPoint
 
 def load_checkpoint(args, logger, model, checkpoint_name):
     # automatically resume from checkpoint if it exists
     if (args.checkpoint_dir /checkpoint_name).is_file():
         ckpt = torch.load(args.checkpoint_dir / checkpoint_name,
                         map_location='cpu')
-        [missing_keys, unexpected_keys ] = model.load_state_dict(ckpt['model'], strict=False)
+
+        ckpt['model'] = updateCheckPointKeys(ckpt['model'])
+        [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
+
+        pth = str(args.checkpoint_dir / checkpoint_name)
         for missed_key in missing_keys:
             if not (missed_key.startswith('backbone.fc') or missed_key.startswith('classHead')):
-                raise ValueError('Found missing keys in checkpoint {}'.format(missing_keys))
+                raise ValueError('{} Found missing keys in checkpoint {}'.format(pth, missing_keys))
         for unexpected_key in unexpected_keys:
             if not ((unexpected_key.startswith('bn.')) or (unexpected_key.startswith('projector.'))):
-                raise ValueError('Found unexpected keys in checkpoint {}'.format(unexpected_keys))        
+                raise ValueError('{} Found unexpected keys in checkpoint {}'.format(pth, unexpected_keys))        
         logger.info('Checkpoint loaded from {}'.format(args.checkpoint_dir / checkpoint_name))
     else:
         logger.info('No checkpoint loaded')
