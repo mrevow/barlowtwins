@@ -14,7 +14,8 @@ learning_rate_weights: 0.2
 learning_rate_biases: 0.0048  # base learning rate for biases and batch norm parameters
 weight_decay: 0.000001
 lambd: 0.0051   # Weight on off diagonal terms
-early_stop_patience: 10 # supervised only
+val_freq: 4
+early_stop_patience: 20
 projector: '8192-8192-8192'  # Projector MLP
 print_freq: 10000
 plot_freq: 100
@@ -24,6 +25,8 @@ master_port: '9756'
 backbone_model: Cnn6
 backbone_kwargs: [{'sample_rate': 16000, 'window_size': 1024, 'hop_size': 800, 'mel_bins': 64, 'fmin': 0, 'fmax': 8000, 'classes_num': 2 }]
 learning_rate: 0.0001 # learning rate for supervised training
+
+
 
 music_classifier_freeze_backbone: false
 music_classifier_epochs: 100
