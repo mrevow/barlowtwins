@@ -213,7 +213,10 @@ def load_checkpoint(args, logger, model, checkpoint_name):
                         map_location='cpu')
 
         ckpt['model'] = updateCheckPointKeys(ckpt['model'])
-        [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
+        if torch.cuda.is_available() and torch.cuda.device_count()>1:
+            [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
+        else:
+            [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
 
         pth = str(args.checkpoint_dir / checkpoint_name)
         for missed_key in missing_keys:
