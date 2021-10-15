@@ -1,6 +1,6 @@
 _include: !include hackBase.yaml
 
-epochs: 2
+epochs: 50
 music_classifier_epochs: 50
 batch_size: 1024
 data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/', 'hack/music-detection-data/music-detection-unlabeled/']  # relative path to the binary data files

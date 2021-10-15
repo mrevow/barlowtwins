@@ -16,7 +16,7 @@ dependencies:
   - torchlibrosa
   - torchvision
   - torchaudio
-  - https://pstntrain2380840354.blob.core.windows.net/azureml/Environment/azureml-private-packages/barlow-1634266328.8444865-py3-none-any.whl
+  - https://pstntrain2380840354.blob.core.windows.net/azureml/Environment/azureml-private-packages/barlow-1634323538.6821887-py3-none-any.whl
   - https://pstntrain2380840354.blob.core.windows.net/azureml/Environment/azureml-private-packages/ic3_ai-0.13-py3-none-any.whl
 - pytorch
 - cudatoolkit=10.1
