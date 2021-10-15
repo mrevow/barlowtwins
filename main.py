@@ -192,6 +192,8 @@ def main_worker(args, logger, gpu):
                     weight_decay_filter=True,
                     lars_adaptation_filter=True)
 
+    early_stopper = EarlyStopper(args)
+
     # automatically resume from checkpoint if it exists
     if (args.checkpoint_dir / args.checkpoint_name ).is_file():
         ckpt = torch.load(args.checkpoint_dir /  args.checkpoint_name,
@@ -207,14 +209,54 @@ def main_worker(args, logger, gpu):
 
     # dataset = torchvision.datasets.ImageFolder(args.data / 'train', Transform())
     dataset = AudioDataset(args=args, logger=logger, mode='train', transform=AudioTransformer(args, logger))
+    dataset_val = AudioDataset(args=args, logger=logger, mode='val', transform=AudioTransformer(args, logger))
     
     sampler = torch.utils.data.distributed.DistributedSampler(dataset) if torch.cuda.is_available() \
         else torch.utils.data.RandomSampler(dataset)
+    sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False) if torch.cuda.is_available() \
+        else torch.utils.data.SequentialSampler(dataset_val)
+
     assert args.batch_size % args.world_size == 0
     per_device_batch_size = args.batch_size // args.world_size
     loader = torch.utils.data.DataLoader(
         dataset, batch_size=per_device_batch_size, num_workers=args.workers,
         pin_memory=True, sampler=sampler)
+    loader_val = torch.utils.data.DataLoader(
+        dataset, batch_size=per_device_batch_size, num_workers=args.workers,
+        pin_memory=True, sampler=sampler_val)       
+
+    def _calc_val_loss_and_save_checkpoint():
+        # model.eval() # uncommented because it makes val_loss jump at the start of training
+        val_loss = 0
+        with torch.no_grad():      
+            for (y1, y2), _,idxs in loader_val:
+                if torch.cuda.is_available():
+                    y1 = y1.cuda(gpu, non_blocking=True)
+                    y2 = y2.cuda(gpu, non_blocking=True)
+                val_loss += model.forward(y1, y2)[0].item()
+        val_loss = val_loss / len(loader_val)
+        # model.train()
+
+        if args.rank == 0:
+            stats = dict(epoch=epoch, step=step,
+                        val_loss=val_loss,
+                        best_val_loss=early_stopper.best_val_loss,
+                        time=int(time.time() - start_time))    
+            logger.info(json.dumps(stats))
+            stats = dict(val_loss=val_loss)    
+            plotStats(args, logger, stats, step, 'TrainIter')
+
+            if val_loss<early_stopper.best_val_loss:
+                # save checkpoint
+                statedict = model.module.state_dict() if torch.cuda.is_available() else model.state_dict()
+                state = dict(epoch=epoch + 1, model=statedict,
+                            optimizer=optimizer.state_dict())
+                torch.save(state, args.checkpoint_dir / 'unsupervised_checkpoint.pth')    
+                logger.info('Checkpoint saved')                    
+
+        # stop early if validation accuracy does not improve
+        stop_early = early_stopper.step(val_loss, step)
+        return stop_early
 
     start_time = time.time()
     scaler = torch.cuda.amp.GradScaler()
@@ -254,18 +296,36 @@ def main_worker(args, logger, gpu):
                                 loss=loss.item(),
                                 time=int(time.time() - start_time))
                     logger.info(json.dumps(stats))
-        if args.rank == 0 and (epoch % args.data_epoch_checkpoint_freq) == 0:
-            # save checkpoint
-            statedict = model.module.state_dict() if torch.cuda.is_available() else model.state_dict()
-            state = dict(epoch=epoch + 1, model=statedict,
-                        optimizer=optimizer.state_dict())
-            torch.save(state, args.checkpoint_dir / args.checkpoint_name)
-    if args.rank == 0:
-        # save final model
-        statedict = model.module.backbone.state_dict() if torch.cuda.is_available() else model.backbone.state_dict()
-        chk = args.backbone_model + '.pth'
-        torch.save(statedict,
-                args.checkpoint_dir / chk)
+
+            if step % args.val_freq == 0:
+                stop_early = _calc_val_loss_and_save_checkpoint()
+                if stop_early:
+                    return
+
+    # calc final val_loss and save checkpoint if better than last saved checkpoint
+    _calc_val_loss_and_save_checkpoint()
+
+class EarlyStopper(object):          
+    def __init__(self, args):
+        self.patience = args.early_stop_patience
+        self.args = args
+        self.best_val_loss = 1e100
+        self.best_step = 0
+        self.cnt = -1
+
+    def step(self, val_loss, epoch):
+        if val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss
+            self.best_step = epoch
+            self.cnt = -1          
+        self.cnt += 1 
+
+        if self.cnt >= self.patience:
+            stop_early = True
+            return stop_early
+        else:
+            stop_early = False
+            return stop_early
 
 
 def adjust_learning_rate(args, optimizer, loader, step):
