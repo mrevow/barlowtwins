@@ -18,19 +18,27 @@ early_stop_patience: 10 # supervised only
 projector: '8192-8192-8192'  # Projector MLP
 print_freq: 10000
 plot_freq: 100
-checkpoint_dir: checkpoint
-checkpoint_name: checkpoint.pth
+checkpoint_name: barlow_checkpoint.pth
 backend: nccl
 master_port: '9756'
 backbone_model: Cnn6
 backbone_kwargs: [{'sample_rate': 16000, 'window_size': 1024, 'hop_size': 800, 'mel_bins': 64, 'fmin': 0, 'fmax': 8000, 'classes_num': 2 }]
 learning_rate: 0.0001 # learning rate for supervised training
 
+music_classifier_freeze_backbone: false
+music_classifier_epochs: 100
+music_classifier_checkpoint_name: music_checkpoint.pth
+
 # Data
-data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/']  # relative path to the binary data files
-data_train_view_files: ['hack/trainConfigs/all.txt']   # relative path to the train view file lists
-data_val_bin_path: ['hack/music-detection-data/sl_training_set_v1/'] # supervised only
-data_val_view_files: ['hack/trainConfigs/supervised_val_v02.txt']    # supervised only
+data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1']  # relative path to the binary data files
+data_train_view_files: ['hack/trainConfigs/train_unsupervised.txt']   # relative path to the train view file lists
+
+data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised training
+data_suptrain_view_files: ['hack/trainConfigs/supervised_train_v02.txt']    # supervised training
+data_supval_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised val (during train)
+data_supval_view_files: ['hack/trainConfigs/supervised_val_v02.txt']    # supervised val (during train)
+data_suptest_bin_path: ['hack/music-detection-data/test_set'] # supervised eval run
+data_suptest_view_files: ['hack/trainConfigs/test.txt']    # supervised eval run
 
 data_num_retry: 10 # Maximum number of retries when  clip cannot be loaded
 data_samp_rate: 16000

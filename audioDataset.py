@@ -26,6 +26,9 @@ class AudioDataset(torch.utils.data.Dataset):
             "train",
             "val",
             "test",
+            "suptrain",
+            "supval",
+            "suptest",
         ], "Split '{}' not supported for AudioDataset".format(mode)
         self.mode = mode
         self.test = True if mode == 'test' else False

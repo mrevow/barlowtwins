@@ -163,7 +163,7 @@ def chooseBackbone(backbone_model, backbone_kwargs, logger):
     return model, lastLayersize, lastLayerName
 
 def main_worker(args, logger, gpu):
-    logger.info("Starting on Device {}".format(gpu))
+    logger.info("Starting unsupervised training on Device {}".format(gpu))
 
     torch.backends.cudnn.benchmark = True
     if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
@@ -193,11 +193,14 @@ def main_worker(args, logger, gpu):
                     lars_adaptation_filter=True)
 
     # automatically resume from checkpoint if it exists
-    if (args.checkpoint_dir / 'checkpoint.pth').is_file():
-        ckpt = torch.load(args.checkpoint_dir / 'checkpoint.pth',
+    if (args.checkpoint_dir / args.checkpoint_name ).is_file():
+        ckpt = torch.load(args.checkpoint_dir /  args.checkpoint_name,
                         map_location='cpu')
         start_epoch = ckpt['epoch']
-        model.load_state_dict(ckpt['model'])
+        if torch.cuda.is_available():
+             model.module.load_state_dict(ckpt['model'])
+        else:
+            model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
     else:
         start_epoch = 0
@@ -225,7 +228,7 @@ def main_worker(args, logger, gpu):
             adjust_learning_rate(args, optimizer, loader, step)
             optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                loss = model.forward(y1, y2)
+                loss, on_diag, off_diag = model.forward(y1, y2)
 
             isNan = torch.isnan(loss)
             assert not torch.all(isNan), "Hit Nan at step {} idxs {}".format(step, idxs)                
@@ -238,9 +241,10 @@ def main_worker(args, logger, gpu):
                                 lr_weights=optimizer.param_groups[0]['lr'],
                                 lr_biases=optimizer.param_groups[1]['lr'],
                                 loss=loss.item(),
+                                on_diag=on_diag.item(),
+                                off_diag=off_diag.item()
                                 )
-                    ite = step + epoch * len(dataset)
-                    plotStats(args, logger, stats, ite, 'TrainIter')
+                    plotStats(args, logger, stats, step, 'TrainIter')
 
             if step % args.print_freq == 0:
                 if args.rank == 0:
@@ -255,12 +259,13 @@ def main_worker(args, logger, gpu):
             statedict = model.module.state_dict() if torch.cuda.is_available() else model.state_dict()
             state = dict(epoch=epoch + 1, model=statedict,
                         optimizer=optimizer.state_dict())
-            torch.save(state, args.checkpoint_dir / 'checkpoint.pth')
+            torch.save(state, args.checkpoint_dir / args.checkpoint_name)
     if args.rank == 0:
         # save final model
         statedict = model.module.backbone.state_dict() if torch.cuda.is_available() else model.backbone.state_dict()
+        chk = args.backbone_model + '.pth'
         torch.save(statedict,
-                args.checkpoint_dir / 'resnet50.pth')
+                args.checkpoint_dir / chk)
 
 
 def adjust_learning_rate(args, optimizer, loader, step):
@@ -296,7 +301,7 @@ def off_diagonal(x):
 
 
 class BarlowTwins(nn.Module):
-    def __init__(self, args, logger, batchTransforms):
+    def __init__(self, args, logger, batchTransforms=None):
         super().__init__()
         self.args = args
         self.logger = logger
@@ -349,7 +354,7 @@ class BarlowTwins(nn.Module):
         on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
         off_diag = off_diagonal(c).pow_(2).sum()
         loss = on_diag + self.args.lambd * off_diag
-        return loss
+        return loss, on_diag, off_diag
 
 
 class LARS(optim.Optimizer):
