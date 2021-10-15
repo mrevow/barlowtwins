@@ -78,7 +78,6 @@ def main():
 
           elif op =='train_supervised':
             logger.tag(name='operation', value=op)
-            logger.tag(name='lr', value=args.learning_rate)
             musicClassifier = MusicClassifier(args)
             musicClassifier.train()
 
