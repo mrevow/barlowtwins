@@ -214,7 +214,7 @@ def load_checkpoint(args, logger, model, checkpoint_name):
 
         ckpt['model'] = updateCheckPointKeys(ckpt['model'])
         if torch.cuda.is_available() and torch.cuda.device_count()>1:
-            [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
+            [missing_keys, unexpected_keys ]  = model.module.load_state_dict(ckpt['model'], strict=False)
         else:
             [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
 
