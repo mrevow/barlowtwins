@@ -226,7 +226,7 @@ def main_worker(args, logger, gpu):
         pin_memory=True, sampler=sampler_val)       
 
     def _calc_val_loss_and_save_checkpoint():
-        # model.eval() # uncommented because it makes val_loss jump at the start of training
+        # model.eval() # uncommented because it makes val_loss jump at the start of training (due to normalization layers presumably)
         val_loss = 0
         with torch.no_grad():      
             for (y1, y2), _,idxs in loader_val:
@@ -304,6 +304,14 @@ def main_worker(args, logger, gpu):
 
     # calc final val_loss and save checkpoint if better than last saved checkpoint
     _calc_val_loss_and_save_checkpoint()
+    
+    if args.rank == 0:
+        # save final model
+        statedict = model.module.backbone.state_dict() if torch.cuda.is_available() else model.backbone.state_dict()
+        chk = args.backbone_model + '.pth'
+        torch.save(statedict,
+                args.checkpoint_dir / chk)
+
 
 class EarlyStopper(object):          
     def __init__(self, args):
