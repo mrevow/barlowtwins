@@ -4,7 +4,10 @@ epochs: 50
 music_classifier_epochs: 50
 batch_size: 1024
 data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/', 'hack/music-detection-data/music-detection-unlabeled/', 'hack/music-detection-data/audioset/']  # relative path to the binary data files
-data_train_view_files: ['hack/trainConfigs/train_unsupervised.txt', 'hack/trainConfigs/music_notLabeled_16572_10secOnly.txt', 'hack/trainConfigs/audioset_470742_16000.txt']   # relative path to the train view file lists
+data_train_view_files: ['hack/trainConfigs/supervised_train_v04.txt', 'hack/trainConfigs/music_notLabeled_16572_10secOnly.txt', 'hack/trainConfigs/audioset_470742_16000.txt']   # relative path to the train view file lists
+data_val_bin_path: ['hack/music-detection-data/sl_training_set_v1/'] 
+data_val_view_files: ['hack/trainConfigs/unsupervised_val_v04.txt']
+
 print_freq: 50
 plot_freq: 5
 val_freq: 4
