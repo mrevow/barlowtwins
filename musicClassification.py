@@ -178,7 +178,7 @@ def eval_test_set(args, logger):
         shuffle=False,
         drop_last=False,
         )
-    logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_val)))
+    logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_test)))
     results = evaluate(model, loader_test, dev)
     logger.info('Accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
     logger.log_value(name='test_accuracy', value=results['accuracy'])
@@ -203,10 +203,7 @@ def load_checkpoint(args, logger, model, checkpoint_name):
                         map_location='cpu')
 
         ckpt['model'] = updateCheckPointKeys(ckpt['model'])
-        if torch.cuda.is_available() and torch.cuda.device_count()>1:
-            [missing_keys, unexpected_keys ]  = model.module.load_state_dict(ckpt['model'], strict=False)
-        else:
-            [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
+        [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
 
         pth = str(args.checkpoint_dir / checkpoint_name)
         for missed_key in missing_keys:
