@@ -20,14 +20,13 @@ plot_freq: 4
 
 # For short tests
 # data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1']  # relative path to the binary data files
-# data_train_view_files: ['hack/trainConfigs/supervised_train_v04.txt']   # relative path to the train view file lists
+# data_train_view_files: ['hack/trainConfigs/short_40.txt']   # relative path to the train view file lists
 # data_val_bin_path: ['hack/music-detection-data/sl_training_set_v1']  # relative path to the binary data files
-# data_val_view_files: ['hack/trainConfigs/supervised_val_v04.txt']   # relative path to the train view file lists
+# data_val_view_files: ['hack/trainConfigs/short_40_val.txt']   # relative path to the train view file lists
 # data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised training
-# data_suptrain_view_files: ['hack/trainConfigs/supervised_train_v04.txt']    # supervised training
+# data_suptrain_view_files: ['hack/trainConfigs/short_40.txt']    # supervised training
 # data_supval_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised val (during train)
-# data_supval_view_files: ['hack/trainConfigs/supervised_val_v04.txt']    # supervised val (during train)
-# data_supval_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised val (during train
+# data_supval_view_files: ['hack/trainConfigs/short_40_val.txt']    # supervised val (during train)
 # data_suptest_view_files: ['hack/trainConfigs/test.txt']    # supervised eval run
 # data_suptest_bin_path: ['hack/music-detection-data/test_set'] # supervised eval run)
 
