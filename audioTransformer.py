@@ -20,8 +20,8 @@ class AudioTransformer(nn.Module):
 
     self.logger.info("Creating sample transforms")
     if supervised:
-      self.transform_1 = self.createTransforms(self.args.data_sup_transforms)
-      self.transform_2 = self.createTransforms(self.args.data_sup_transforms)
+      self.transform_1 = self.createTransforms(self.args.sup_data_transforms)
+      self.transform_2 = self.createTransforms(self.args.sup_data_transforms)
     else:      
       self.transform_1 = self.createTransforms(self.args.data_transforms_1)
       self.transform_2 = self.createTransforms(self.args.data_transforms_2)

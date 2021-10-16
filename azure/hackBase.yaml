@@ -29,7 +29,10 @@ music_classifier_freeze_backbone: false
 music_classifier_epochs: 1000
 music_classifier_checkpoint_name: music_checkpoint.pth
 music_classifier_learning_rate: 0.0001 # learning rate for supervised training
+<<<<<<< HEAD
 music_classifier_early_stop_patience: 20
+=======
+>>>>>>> 3fb5031a9e74c76114c075e707767e7c31d43161
 
 # Data
 data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1']  # relative path to the binary data files
@@ -64,7 +67,7 @@ data_transforms_2: [
     ['ExpandDim', {'dim': 0}] 
   ]
 
-data_sup_transforms: [ 
+sup_data_transforms: [ 
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
   ]
