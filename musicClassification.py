@@ -146,10 +146,10 @@ def train(args, logger):
             logger.info('Checkpoint saved')
             logger.log_value(name='val_best_accuracy', value=results['accuracy'])
 
-            # stop early if validation accuracy does not improve
-            stop_early = early_stopper.step(results['accuracy'], epoch+1)
-            if stop_early:
-                return
+        # stop early if validation accuracy does not improve
+        stop_early = early_stopper.step(results['accuracy'], epoch+1)
+        if stop_early:
+            return
 
 
 def eval_test_set(args, logger):
