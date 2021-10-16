@@ -2,8 +2,11 @@ from torch import nn
 import torch
 from torchaudio import transforms as torchAudioTransforms 
 import barlowtwins.audioTransforms as localTransforms
+import soundfile as sf
 import librosa
 import os
+import uuid
+import torchaudio
 
 class AudioTransformer(nn.Module):
   '''
@@ -45,38 +48,32 @@ class AudioTransformer(nn.Module):
     self.logger.info("Final Transforms: {} ".format(transforms))
     return nn.Sequential(*transforms)
   
-  def write_wav_to_azure(x, file_name):
+  def write_wav_to_azure(self, x, file_name):
     # Rate is 16K
     # write as binary file
     try:
       print("*** SHAPE".format(x.shape))
-      path = os.path.join("./outputs", "out_"+file_name+".wav")
-      with open(path, 'w') as f:
-        f.write(bytearray(x))
-    except:
-      print("Failed writting binary file to outputs")
+      path = os.path.join("./outputs", "torch_"+file_name+".wav")
+      torchaudio.save(path, x, 16000)
+    except Exception as e:
+      print("**Failed writting binary file to outputs")
+      print(e)
 
     try:
-      path = os.path.join("./logs", "out_"+file_name+".wav")
-      with open(path, 'w') as f:
-        f.write(bytearray(x))
-    except:
-      print("Failed writting binary file to logs")
-
-    try:
-      librosa.output.write_wav(os.path.join("./outputs", 'lib_'+file_name+".wav"), x, 16000)
-    except:
+      sf.write(os.path.join("./outputs", 'lib_'+file_name+".wav"), x, 16000)
+    except Exception as e:
       print("Failed writting librosa")
+      print(e)
 
   
   def __call__(self, x):
-
+    file_name = str(uuid.uuid4())
     print("*** Before any transform")
-    write_wav_to_azure(x, file_name)
+    self.write_wav_to_azure(x, file_name+"_BT")
     y1 = self.transform_1(x)
     
     print("*** After first transform")
-    write_wav_to_azure(y1, file_name)
+    self.write_wav_to_azure(y1, file_name+"_AT")
     y2 = self.transform_2(x)
     return y1, y2
 
