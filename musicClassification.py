@@ -54,7 +54,7 @@ class MusicClassifier(object):
         self.loggerWorkaround(urllib3Logger, "urllib3 logger")
 
 
-    def train(self, gpu=None):
+    def train(self):
         with CreateLogger(self.args, logger_type=self.args.logger_type) as logger:
             self.logger = logger
             self.loggerWorkaroundAll()
@@ -62,13 +62,13 @@ class MusicClassifier(object):
 
             train(self.args, logger)
 
-    def eval(self, gpu=None):
+    def eval(self):
         with CreateLogger(self.args, logger_type=self.args.logger_type) as logger:
             self.logger = logger
             self.loggerWorkaroundAll()
             self.args.checkpoint_dir = Path(self.args.output_dir)
 
-            eval_validation_set(self.args, logger)
+            eval_test_set(self.args, logger)
 
 
 def train(args, logger):
@@ -82,15 +82,15 @@ def train(args, logger):
     logger.info('Loaded music classifier model')
     logger.debug(model)
 
-    # train on gpu if available
-    dev, model = get_device(logger, model)
-
     # automatically resume from checkpoint if it exists
     model = load_checkpoint(args, logger, model, args.checkpoint_name)
 
+    # train on gpu if available
+    dev, model = get_device(logger, model)
+
     # load datasets
-    dataset_train = AudioDataset(args=args, logger=logger, mode='suptrain', transform=AudioTransformer(args, logger))
-    dataset_val = AudioDataset(args=args, logger=logger, mode='supval', transform=AudioTransformer(args, logger))
+    dataset_train = AudioDataset(args=args, logger=logger, mode='suptrain', transform=AudioTransformer(args, logger, supervised=True))
+    dataset_val = AudioDataset(args=args, logger=logger, mode='supval', transform=AudioTransformer(args, logger,  supervised=True))
     sampler_train = torch.utils.data.RandomSampler(dataset_train)
     loader_train = torch.utils.data.DataLoader(
         dataset_train, 
@@ -106,7 +106,7 @@ def train(args, logger):
         )
 
     # prepare for training
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=args.music_classifier_learning_rate)
     criterion = nn.BCELoss()
     early_stopper = EarlyStopper(args)
 
@@ -123,49 +123,36 @@ def train(args, logger):
             loss.backward()
             optimizer.step()
 
-            if step %args.plot_freq == 0:
-                logger.log_row(name='loss', step=step, loss=loss.item())
+            # print/plot info
+            logger.log_row(name='sup_loss', step=step, loss=loss.item())
+            stats = dict(epoch=epoch, step=step,
+                        loss=loss.item(),
+                        time=int(time.time() - start_time))
+            logger.info(json.dumps(stats))
 
-            if step % args.print_freq == 0:
-                stats = dict(epoch=epoch, step=step,
-                            loss=loss.item(),
-                            time=int(time.time() - start_time))
-                logger.info(json.dumps(stats))
-                if dev==torch.device("cuda"):
-                    logger.debug(subprocess.check_output("nvidia-smi", shell=True, universal_newlines=True))
+        # evaluate on validation set after each epoch
+        results = evaluate(model, loader_val, dev)
+        logger.info('Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
+        logger.log_row(name='val_accuracy', epoch=epoch, accuracy=results['accuracy'])
+        logger.log_row(name='val_recall', epoch=epoch, accuracy=results['recall'])
+        logger.log_row(name='val_precision', epoch=epoch, accuracy=results['precision'])
 
-        # save checkpoint if best accuracy on validation set
-        if (epoch % args.data_epoch_checkpoint_freq) == 0:
-
-            results = evaluate(model, loader_val, dev)
-            logger.info('Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
-            logger.log_row(name='accuracy', epoch=epoch, accuracy=results['accuracy'])
-            logger.log_row(name='recall', epoch=epoch, accuracy=results['recall'])
-            logger.log_row(name='precision', epoch=epoch, accuracy=results['precision'])
-
-            # save checkpoint
-            if results['accuracy']>early_stopper.best_accuracy:
-                statedict = model.module.state_dict() if (torch.cuda.device_count()>1) else model.state_dict()
-                state = dict(epoch=epoch + 1, model=statedict,
-                            optimizer=optimizer.state_dict())
-                torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
-                logger.info('Checkpoint saved')
-                logger.log_value(name='best_accuracy', value=results['accuracy'])
+        # save checkpoint
+        if results['accuracy']>early_stopper.best_accuracy:
+            statedict = model.module.state_dict() if (torch.cuda.device_count()>1) else model.state_dict()
+            state = dict(epoch=epoch + 1, model=statedict,
+                        optimizer=optimizer.state_dict())
+            torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
+            logger.info('Checkpoint saved')
+            logger.log_value(name='val_best_accuracy', value=results['accuracy'])
 
             # stop early if validation accuracy does not improve
             stop_early = early_stopper.step(results['accuracy'], epoch+1)
             if stop_early:
                 return
 
-    if not (args.checkpoint_dir /  args.music_classifier_checkpoint_name).is_file():
-        # Save the last iteration as checkpoint if nothing exists
-        statedict = model.module.state_dict() if (torch.cuda.device_count()>1) else model.state_dict()
-        state = dict(epoch=epoch + 1, model=statedict,
-                    optimizer=optimizer.state_dict())
-        torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
 
-
-def eval_validation_set(args, logger):
+def eval_test_set(args, logger):
     logger.info("Start musicClassifier supervised evaluation")
     if args.data_batch_transforms_1 is not None and args.data_batch_transforms_2 is not None:
         batchTransforms = AudioTransformerBatch(args, logger)
@@ -176,24 +163,27 @@ def eval_validation_set(args, logger):
     logger.info('Loaded music classifier model')
     logger.debug(model)
 
-    # run on gpu if available
-    dev, model = get_device(logger, model)
-
     # load checkpoint
     model = load_checkpoint(args, logger, model, args.music_classifier_checkpoint_name)
 
+    # run on gpu if available
+    dev, model = get_device(logger, model)
+
     # load datasets
-    dataset_val = AudioDataset(args=args, logger=logger, mode='suptest', transform=AudioTransformer(args, logger))
-    loader_val = torch.utils.data.DataLoader(
-        dataset_val, 
+    dataset_test = AudioDataset(args=args, logger=logger, mode='suptest', transform=AudioTransformer(args, logger, supervised=True))
+    loader_test = torch.utils.data.DataLoader(
+        dataset_test, 
         batch_size=args.batch_size, 
         num_workers=args.workers,
         shuffle=False,
         drop_last=False,
         )
-    logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_val)))
-    results = evaluate(model, loader_val, dev)
+    logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_test)))
+    results = evaluate(model, loader_test, dev)
     logger.info('Accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
+    logger.log_value(name='test_accuracy', value=results['accuracy'])
+    logger.log_value(name='test_recall', value=results['recall'])
+    logger.log_value(name='test_precision', value=results['precision'])
     return results
 
 def updateCheckPointKeys(chkPoint, subs="module."):
@@ -213,10 +203,7 @@ def load_checkpoint(args, logger, model, checkpoint_name):
                         map_location='cpu')
 
         ckpt['model'] = updateCheckPointKeys(ckpt['model'])
-        if torch.cuda.is_available() and torch.cuda.device_count()>1:
-            [missing_keys, unexpected_keys ]  = model.module.load_state_dict(ckpt['model'], strict=False)
-        else:
-            [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
+        [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
 
         pth = str(args.checkpoint_dir / checkpoint_name)
         for missed_key in missing_keys:
@@ -250,6 +237,7 @@ def evaluate(model, loader, dev):
         model.eval()
         with torch.no_grad():
             yy = [ [model(x1.to(dev)).cpu().numpy()>0.5, y1.cpu().numpy()] for ((x1, _), y1, _) in loader]
+        model.train()
         yy = np.concatenate( yy, axis=1 )
         y_pred = yy[0,:].reshape(-1,1)
         y_true = yy[1,:].reshape(-1,1)
@@ -262,7 +250,7 @@ def evaluate(model, loader, dev):
 
 class EarlyStopper(object):          
     def __init__(self, args):
-        self.patience = args.early_stop_patience
+        self.patience = args.music_classifier_early_stop_patience
         self.args = args
         self.best_accuracy = -1e10
         self.best_epoch = 0
