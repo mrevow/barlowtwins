@@ -67,7 +67,7 @@ data_transforms_2: [
     ['ExpandDim', {'dim': 0}] 
   ]
 
-sup_data_transforms: [ 
+data_sup_transforms: [ 
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
   ]
