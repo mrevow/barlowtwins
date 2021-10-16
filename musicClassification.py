@@ -263,7 +263,7 @@ def evaluate(model, loader, dev):
 
 class EarlyStopper(object):          
     def __init__(self, args):
-        self.patience = args.early_stop_patience
+        self.patience = args.music_classifier_early_stop_patience
         self.args = args
         self.best_accuracy = -1e10
         self.best_epoch = 0
