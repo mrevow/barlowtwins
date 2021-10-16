@@ -38,9 +38,9 @@ data_val_bin_path: ['hack/music-detection-data/sl_training_set_v1/']
 data_val_view_files: ['hack/trainConfigs/unsupervised_val_v04.txt']
 
 data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised training
-data_suptrain_view_files: ['hack/trainConfigs/supervised_train_v02.txt']    # supervised training
+data_suptrain_view_files: ['hack/trainConfigs/supervised_train_v04.txt']    # supervised training
 data_supval_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised val (during train)
-data_supval_view_files: ['hack/trainConfigs/supervised_val_v02.txt']    # supervised val (during train)
+data_supval_view_files: ['hack/trainConfigs/supervised_val_v04.txt']    # supervised val (during train)
 data_suptest_bin_path: ['hack/music-detection-data/test_set'] # supervised eval run
 data_suptest_view_files: ['hack/trainConfigs/test.txt']    # supervised eval run
 
