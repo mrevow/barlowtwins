@@ -159,12 +159,12 @@ def train(args, logger):
             logger.info('Checkpoint saved {}'.format(args.checkpoint_dir / args.music_classifier_checkpoint_name))
             logger.log_value(name='val_best_accuracy', value=results['accuracy'])
 
-            # stop early if validation accuracy does not improve
-            stop_early = early_stopper.step(results['accuracy'], epoch+1)
-            if stop_early:
-                # Plot PR curves for best 
-                results = evaluate(model, loader_val, dev, args, logger, name='Best Validation', doPrPlot=True)
-                return
+        # stop early if validation accuracy does not improve
+        stop_early = early_stopper.step(results['accuracy'], epoch+1)
+        if stop_early:
+            # Plot PR curves for best 
+            results = evaluate(model, loader_val, dev, args, logger, name='Best Validation', doPrPlot=True)
+            return
 
         if epoch == 0:
             dataset_train.reportClipStats()
