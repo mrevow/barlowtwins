@@ -13,6 +13,7 @@ import torch
 from barlowtwins.main import BarlowTwins
 from barlowtwins.audioDataset import AudioDataset
 from barlowtwins.audioTransformer import AudioTransformer, AudioTransformerBatch
+from barlowtwins.metricsReporter import MetricsReporter
 
 # from common.utils.pathUtils import createFullPathTree, ensureDir, savePickle, loadPickle
 from common.utils.logger import CreateLogger
@@ -59,6 +60,7 @@ class MusicClassifier(object):
             self.logger = logger
             self.loggerWorkaroundAll()
             self.args.checkpoint_dir = Path(self.args.output_dir)
+            self.args.rank = 0
 
             train(self.args, logger)
 
@@ -67,6 +69,7 @@ class MusicClassifier(object):
             self.logger = logger
             self.loggerWorkaroundAll()
             self.args.checkpoint_dir = Path(self.args.output_dir)
+            self.args.rank = 0
 
             eval_test_set(self.args, logger)
 
@@ -109,16 +112,23 @@ def train(args, logger):
     optimizer = optim.Adam(model.parameters(), lr=args.music_classifier_learning_rate)
     criterion = nn.BCELoss()
     early_stopper = EarlyStopper(args)
+    # To calculate binary Stats
+    metricsReporter = MetricsReporter(args, logger)
 
     start_time = time.time()
     logger.info('Start musicClassifier training for {} epochs'.format(args.music_classifier_epochs))
     for epoch in range(0, args.music_classifier_epochs):
+        predsAll = []
+        labelsAll = []
         for step, ((x1, _), y1, _) in enumerate(loader_train, start=epoch * len(loader_train)):
             y1 = y1.type(torch.float).to(dev)
             x1 = x1.to(dev)
 
             optimizer.zero_grad()
             x1 = model.forward(x1)
+            predsAll.extend(x1.detach().cpu().numpy())
+            labelsAll.extend(y1.detach().cpu().numpy())
+
             loss = criterion(x1,y1)
             loss.backward()
             optimizer.step()
@@ -129,13 +139,16 @@ def train(args, logger):
                         loss=loss.item(),
                         time=int(time.time() - start_time))
             logger.info(json.dumps(stats))
+            metrics = metricsReporter.calcBinaryStats(predsAll, labelsAll)
+            metrics['loss'] = loss.item()
+            metricsReporter.plotStats(metrics, ite=step, typ='Supervised train')
 
         # evaluate on validation set after each epoch
-        results = evaluate(model, loader_val, dev)
+        results = evaluate(model, loader_val, dev, args, logger)
         logger.info('Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
-        logger.log_row(name='val_accuracy', epoch=epoch, accuracy=results['accuracy'])
-        logger.log_row(name='val_recall', epoch=epoch, accuracy=results['recall'])
-        logger.log_row(name='val_precision', epoch=epoch, accuracy=results['precision'])
+        metrics = metricsReporter.calcBinaryStats(predsAll, labelsAll)
+        metrics.update(results)
+        metricsReporter.plotStats(metrics, ite=epoch, typ='SupervisedValidation')
 
         # save checkpoint
         if results['accuracy']>early_stopper.best_accuracy:
@@ -143,13 +156,21 @@ def train(args, logger):
             state = dict(epoch=epoch + 1, model=statedict,
                         optimizer=optimizer.state_dict())
             torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
-            logger.info('Checkpoint saved')
+            logger.info('Checkpoint saved {}'.format(args.checkpoint_dir / args.music_classifier_checkpoint_name))
             logger.log_value(name='val_best_accuracy', value=results['accuracy'])
 
         # stop early if validation accuracy does not improve
         stop_early = early_stopper.step(results['accuracy'], epoch+1)
         if stop_early:
+            # Plot PR curves for best 
+            results = evaluate(model, loader_val, dev, args, logger, name='Best Validation', doPrPlot=True)
             return
+
+        if epoch == 0:
+            dataset_train.reportClipStats()
+        dataset_train.resetCounters()
+
+    results = evaluate(model, loader_val, dev, args, logger, name='Final Validation', doPrPlot=True)
 
 
 def eval_test_set(args, logger):
@@ -179,11 +200,13 @@ def eval_test_set(args, logger):
         drop_last=False,
         )
     logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_test)))
-    results = evaluate(model, loader_test, dev)
-    logger.info('Accuracy {:0.3f}, recall {:0.3f}, precision {:0.3f}, '.format(results['accuracy'], results['recall'], results['precision'],))
-    logger.log_value(name='test_accuracy', value=results['accuracy'])
-    logger.log_value(name='test_recall', value=results['recall'])
-    logger.log_value(name='test_precision', value=results['precision'])
+    results = evaluate(model, loader_test, dev, args, logger, name='Test', doPrPlot=True)
+    resultPrint = { k: ":0.3f".format(v) for k,v in results.items()}
+    logger.info("Test result N {} {}".format(len(dataset_test), resultPrint))
+
+    metricsReporter = MetricsReporter(args, logger)
+    metricsReporter.logValues(results, typ='SupervisedTest')
+    dataset_test.reportClipStats()
     return results
 
 def updateCheckPointKeys(chkPoint, subs="module."):
@@ -198,6 +221,7 @@ def updateCheckPointKeys(chkPoint, subs="module."):
 
 def load_checkpoint(args, logger, model, checkpoint_name):
     # automatically resume from checkpoint if it exists
+    pth = str(args.checkpoint_dir / checkpoint_name)
     if (args.checkpoint_dir /checkpoint_name).is_file():
         ckpt = torch.load(args.checkpoint_dir / checkpoint_name,
                         map_location='cpu')
@@ -205,16 +229,15 @@ def load_checkpoint(args, logger, model, checkpoint_name):
         ckpt['model'] = updateCheckPointKeys(ckpt['model'])
         [missing_keys, unexpected_keys ]  = model.load_state_dict(ckpt['model'], strict=False)
 
-        pth = str(args.checkpoint_dir / checkpoint_name)
         for missed_key in missing_keys:
             if not (missed_key.startswith('backbone.fc') or missed_key.startswith('classHead')):
                 raise ValueError('{} Found missing keys in checkpoint {}'.format(pth, missing_keys))
         for unexpected_key in unexpected_keys:
             if not ((unexpected_key.startswith('bn.')) or (unexpected_key.startswith('projector.'))):
                 raise ValueError('{} Found unexpected keys in checkpoint {}'.format(pth, unexpected_keys))        
-        logger.info('Checkpoint loaded from {}'.format(args.checkpoint_dir / checkpoint_name))
+        logger.info('Checkpoint loaded from {}'.format(pth))
     else:
-        logger.info('No checkpoint loaded')
+        logger.info('No checkpoint found at {}'.format(pth))
     return model
 
 
@@ -233,18 +256,20 @@ def get_device(logger, model):
     return dev, model
 
 
-def evaluate(model, loader, dev):
+def evaluate(model, loader, dev, args, logger, name='', doPrPlot=False):
         model.eval()
         with torch.no_grad():
-            yy = [ [model(x1.to(dev)).cpu().numpy()>0.5, y1.cpu().numpy()] for ((x1, _), y1, _) in loader]
+            yy = [ [model(x1.to(dev)).cpu().numpy(), y1.cpu().numpy()] for ((x1, _), y1, _) in loader]
         model.train()
+        metricsReporter = MetricsReporter(args, logger)
         yy = np.concatenate( yy, axis=1 )
         y_pred = yy[0,:].reshape(-1,1)
         y_true = yy[1,:].reshape(-1,1)
-        accuracy = accuracy_score(y_true, y_pred)
-        recall = recall_score(y_true, y_pred)
-        precision = precision_score(y_true, y_pred)
+        accuracy = accuracy_score(y_true, y_pred > 0.5)
+        recall = recall_score(y_true, y_pred > 0.5)
+        precision = precision_score(y_true, y_pred > 0.5)
         results = {'accuracy': accuracy, 'recall': recall, 'precision': precision}
+        results.update(metricsReporter.calcBinaryStats(y_pred, y_true, name, doPrPlot))
         return results
 
 

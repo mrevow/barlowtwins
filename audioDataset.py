@@ -35,6 +35,7 @@ class AudioDataset(torch.utils.data.Dataset):
         self.args = args
         self.logger = logger
         self.transform = transform
+        self.resetCounters()
 
         bin_path_name = "data_{}_bin_path".format(mode.lower())
         assert hasattr(self.args, bin_path_name), "Config does not have the bin_data path data.{}".format(bin_path_name)
@@ -65,6 +66,15 @@ class AudioDataset(torch.utils.data.Dataset):
         self.clipList.extend(files)
         self.logger.info("Loading {} files from {} Total {}".format(len(files), viewFile, len(self.clipList)))
 
+    def resetCounters(self):
+        self.skippedShort = 0
+        self.truncated = 0
+        self.padded = 0
+
+    def reportClipStats(self):
+        self.logger.info("ClipStats: data_{} GPU {} Total {} skipped {} delivered {} padded {} trancated {}".format(
+            self.mode, self.args.rank,  self.__len__(), self.skippedShort, self.__len__() - self.skippedShort, self.padded, self.truncated))
+
     def loadClip(self, index):
         clip = None
         label = None
@@ -75,16 +85,21 @@ class AudioDataset(torch.utils.data.Dataset):
         fPath, label = self.clipList[index]
         if os.path.exists(fPath):
             clip, sr = lb.load(fPath, sr=self.args.data_samp_rate)
-            if len(clip) < int(sr*self.args.data_pad_duration):
-                if len(clip) < (sr*self.args.data_pad_duration)/2:
-                    self.logger.warning('audio file {} is only {:0.2f} long'.format(fPath, len(clip)/sr))
-                x = np.zeros(sr*self.args.data_pad_duration, dtype='float32')
-                x[:len(clip)] = clip
-                clip = x
-            if len(clip) > int(sr*self.args.data_pad_duration):
-                self.logger.warning('audio file {} is too long: {:0.2f} seconds. only first {} seconds will be used'.format(fPath, len(clip)/sr, self.args.data_pad_duration))
+            if clip is not None and len(clip) < int(sr*self.args.data_pad_duration):
+                if len(clip) < (sr*self.args.data_short_thresh):
+                    self.logger.debug('audio file {} is only {:0.2f} long'.format(fPath, len(clip)/sr))
+                    self.skippedShort += 1
+                    clip = None
+                else:
+                    x = np.zeros(sr*self.args.data_pad_duration, dtype='float32')
+                    x[:len(clip)] = clip
+                    clip = x
+                    self.padded += 1
+            if clip is not None and len(clip) > int(sr*self.args.data_pad_duration):
+                self.logger.debug('audio file {} is too long: {:0.2f} seconds. only first {} seconds will be used'.format(fPath, len(clip)/sr, self.args.data_pad_duration))
                 clip = clip[:sr*self.args.data_pad_duration]
-            clip = torch.tensor(clip)
+                self.truncated += 1
+            clip = None if clip is None else torch.tensor(clip)
             if sr != self.args.data_samp_rate:
                 self.logger.debug("Got samp rate {} Expect {} while loading  {}".format(sr, self.args.data_samp_rate, fPath))
                 clip = None

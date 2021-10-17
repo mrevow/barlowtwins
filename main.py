@@ -25,6 +25,7 @@ import audioset_tagging_cnn.pytorch.models as audiosetModels
 
 from barlowtwins.audioTransformer import AudioTransformer, AudioTransformerBatch
 from barlowtwins.audioDataset import AudioDataset
+from barlowtwins.metricsReporter import MetricsReporter
 
 from common.utils.pathUtils import createFullPathTree, ensureDir, savePickle, loadPickle
 from common.utils.logger import CreateLogger
@@ -204,6 +205,7 @@ def main_worker(args, logger, gpu):
         else:
             model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
+        logger.info("Unsupervised loaded checkpoint {}".format(args.checkpoint_dir /  args.checkpoint_name))
     else:
         start_epoch = 0
 
@@ -235,6 +237,10 @@ def main_worker(args, logger, gpu):
                     y2 = y2.cuda(gpu, non_blocking=True)
                 val_loss += model.forward(y1, y2)[0].item()
         val_loss = val_loss / len(loader_val)
+
+        if epoch == 0:
+            dataset_val.reportClipStats()
+        dataset_val.resetCounters()
         # model.train()
 
         if args.rank == 0:
@@ -243,7 +249,7 @@ def main_worker(args, logger, gpu):
                         best_val_loss=early_stopper.best_val_loss,
                         time=int(time.time() - start_time))    
             logger.info(json.dumps(stats))
-            stats = dict(val_loss=val_loss)    
+            stats = dict(us_val_loss=val_loss)    
             plotStats(args, logger, stats, step, 'TrainIter')
 
             if val_loss<early_stopper.best_val_loss:
@@ -251,8 +257,8 @@ def main_worker(args, logger, gpu):
                 statedict = model.module.state_dict() if torch.cuda.is_available() else model.state_dict()
                 state = dict(epoch=epoch + 1, model=statedict,
                             optimizer=optimizer.state_dict())
-                torch.save(state, args.checkpoint_dir / 'unsupervised_checkpoint.pth')    
-                logger.info('Checkpoint saved')                    
+                torch.save(state, args.checkpoint_dir / args.checkpoint_name)    
+                logger.info('Unsupervised Checkpoint saved {}'.format(args.checkpoint_dir / args.checkpoint_name))                    
 
         # stop early if validation accuracy does not improve
         stop_early = early_stopper.step(val_loss, step)
@@ -260,6 +266,9 @@ def main_worker(args, logger, gpu):
 
     start_time = time.time()
     scaler = torch.cuda.amp.GradScaler()
+    step = epoch = 0
+    metricsReporter = MetricsReporter(args, logger)
+    
     for epoch in range(start_epoch, args.epochs):
         if torch.cuda.is_available():
             sampler.set_epoch(epoch)
@@ -282,11 +291,11 @@ def main_worker(args, logger, gpu):
                     stats = dict(
                                 lr_weights=optimizer.param_groups[0]['lr'],
                                 lr_biases=optimizer.param_groups[1]['lr'],
-                                loss=loss.item(),
-                                on_diag=on_diag.item(),
-                                off_diag=off_diag.item()
+                                us_loss=loss.item(),
+                                us_on_diag=on_diag.item(),
+                                us_off_diag=off_diag.item()
                                 )
-                    plotStats(args, logger, stats, step, 'TrainIter')
+                    metricsReporter.plotStats(stats, step, 'UnsupervisedTrain')
 
             if step % args.print_freq == 0:
                 if args.rank == 0:
@@ -301,9 +310,12 @@ def main_worker(args, logger, gpu):
                 stop_early = _calc_val_loss_and_save_checkpoint()
                 if stop_early:
                     return
-
+        if epoch == 0:
+            dataset.reportClipStats()
+        dataset.resetCounters()
     # calc final val_loss and save checkpoint if better than last saved checkpoint
-    _calc_val_loss_and_save_checkpoint()
+    if step > 0:
+        _calc_val_loss_and_save_checkpoint()
     
     if args.rank == 0:
         # save final model
@@ -311,6 +323,7 @@ def main_worker(args, logger, gpu):
         chk = args.backbone_model + '.pth'
         torch.save(statedict,
                 args.checkpoint_dir / chk)
+        logger.info("Unsupervised model save {}".format(args.checkpoint_dir / chk))
 
 
 class EarlyStopper(object):          
