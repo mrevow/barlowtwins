@@ -30,6 +30,11 @@ music_classifier_epochs: 1000
 music_classifier_checkpoint_name: music_checkpoint.pth
 music_classifier_learning_rate: 0.0001 # learning rate for supervised training
 music_classifier_early_stop_patience: 20
+music_classifier_metrics_at_recall: [0.85, 0.95]  # Preciosn at recall
+music_classifier_metrics_at_precision: [0.95, 0.99]  # Recall at precison
+music_classifier_metrics_at_fpr: [0.1, 0.2,]  # TPR at FPR
+music_classifier_metrics_at_tpr: [0.95, 0.99]  # FPR at TPR
+music_classifier_metrics_plt_pause_delay_sec: -1  # setting > 0 will show the metrics plots for local runs no impact on AML
 
 # Data
 data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1']  # relative path to the binary data files
@@ -46,10 +51,11 @@ data_suptest_view_files: ['hack/trainConfigs/test.txt']    # supervised eval run
 
 data_num_retry: 10 # Maximum number of retries when  clip cannot be loaded
 data_samp_rate: 16000
-data_plot_max_limits: {}
-data_plot_min_limits: {}
+data_plot_max_limits: {'us_loss': 10000, 'val_loss': 10000, 'auc': 1.0}
+data_plot_min_limits: {'us_loss': 0.0, 'val_loss': 0.0, 'auc': 0.0}
 data_epoch_checkpoint_freq: 5
 data_pad_duration: 10 # files short than data_pad_duration seconds will be zero padded
+data_short_thresh: 9  # Clips shorter than this are skipped
 
 # Transforms must be one of torchAudio transforms - see https://pytorch.org/audio/stable/transforms.html
 # Each entry is a tuple [TransformName, arguments]
