@@ -1,19 +1,34 @@
 _include: !include hackBase.yaml
 
-epochs: 150
-batch_size: 1024
+epochs: 100
+batch_size: 256
 val_freq: 5
 early_stop_patience: 20
 
-music_classifier_epochs: 150
+print_freq: 50
+plot_freq: 5
 
-data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/', 'hack/music-detection-data/music-detection-unlabeled/', 'hack/music-detection-data/audioset/']  # relative path to the binary data files
-data_train_view_files: ['hack/trainConfigs/unsupervised_train_v04.txt', 'hack/trainConfigs/music_notLabeled_16572_10secOnly.txt', 'hack/trainConfigs/audioset_470742_16000.txt']   # relative path to the train view file lists
-data_val_bin_path: ['hack/music-detection-data/sl_training_set_v1/'] 
-data_val_view_files: ['hack/trainConfigs/unsupervised_val_v04.txt']
+music_classifier_epochs: 200
 
-print_freq: 250
-plot_freq: 10
+
+# Yasaman's data files
+data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1/', 'hack/music-detection-data/music-detection-unlabeled2']  # relative path to the binary data files
+data_train_view_files: ['hack/trainConfigs/unsupervised_train_128K_fromAllTxt.txt', 'hack/trainConfigs/unsupervised_train_1_8M_fromUnlabeled2.txt', ]   # relative path to the train view file lists
+data_val_bin_path: ['hack/music-detection-data/music-detection-unlabeled2'] 
+data_val_view_files: ['hack/trainConfigs/unsupervised_valiation_5K_fromUnlabeled2.txt']
+
+data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised training
+data_suptrain_view_files: ['hack/trainConfigs/supervised_train_1K.txt']    # supervised training
+# data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1', 'hack/music-detection-data/sl_training_set_v1', ] # supervised training
+# data_suptrain_view_files: ['hack/trainConfigs/supervised_train_2K.txt', 'hack/trainConfigs/supervised_train_4K.txt', ]    # supervised training
+# data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1', 'hack/music-detection-data/sl_training_set_v1', 'hack/music-detection-data/sl_training_set_v1', ]
+# data_suptrain_view_files: ['hack/trainConfigs/supervised_train_1K.txt', 'hack/trainConfigs/supervised_train_3K.txt', 'hack/trainConfigs/supervised_train_4K.txt', ]
+# data_suptrain_bin_path: ['hack/music-detection-data/sl_training_set_v1', 'hack/music-detection-data/sl_training_set_v1', 'hack/music-detection-data/sl_training_set_v1', 'hack/music-detection-data/sl_training_set_v1'] # supervised training
+# data_suptrain_view_files: ['hack/trainConfigs/supervised_train_1K.txt', 'hack/trainConfigs/supervised_train_2K.txt', 'hack/trainConfigs/supervised_train_3K.txt', 'hack/trainConfigs/supervised_train_4K.txt']    # supervised training
+
+data_supval_bin_path: ['hack/music-detection-data/sl_training_set_v1'] # supervised val (during train)
+data_supval_view_files: ['hack/trainConfigs/supervised_validation_1K.txt']    # supervised val (during train)
+
 
 # For short tests
 # data_train_bin_path: ['hack/music-detection-data/sl_training_set_v1']  # relative path to the binary data files
@@ -28,11 +43,8 @@ plot_freq: 10
 # data_suptest_view_files: ['hack/trainConfigs/short_40_val.txt']    # supervised eval run
 
 operations: ['train_unsupervised', 'train_supervised', 'eval_supervised']
-# Example of training the classifier from a previous run
-# operations: [ 'train_supervised', 'eval_supervised']
 # music_classifier_freeze_backbone: True
 
 # To use a torchvision Net
 backbone_model: resnet18
 backbone_kwargs: [{ "zero_init_residual": True}]
-

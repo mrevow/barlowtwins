@@ -238,7 +238,7 @@ def main_worker(args, logger, gpu):
                 val_loss += model.forward(y1, y2)[0].item()
         val_loss = val_loss / len(loader_val)
 
-        if epoch == 0:
+        if step == 0:
             dataset_val.reportClipStats()
         dataset_val.resetCounters()
         # model.train()
@@ -247,10 +247,12 @@ def main_worker(args, logger, gpu):
             stats = dict(epoch=epoch, step=step,
                         val_loss=val_loss,
                         best_val_loss=early_stopper.best_val_loss,
-                        time=int(time.time() - start_time))    
-            logger.info(json.dumps(stats))
-            stats = dict(us_val_loss=val_loss)    
-            plotStats(args, logger, stats, step, 'TrainIter')
+                        time=int(time.time() - start_time))
+            if step % args.print_freq == 0:    
+                logger.info(json.dumps(stats))
+            if step % args.plot_freq == 0:
+                stats = dict(us_val_loss=val_loss)    
+                plotStats(args, logger, stats, step, 'TrainIter')
 
             if val_loss<early_stopper.best_val_loss:
                 # save checkpoint
@@ -302,13 +304,34 @@ def main_worker(args, logger, gpu):
                     stats = dict(epoch=epoch, step=step,
                                 lr_weights=optimizer.param_groups[0]['lr'],
                                 lr_biases=optimizer.param_groups[1]['lr'],
-                                loss=loss.item(),
+                                us_loss=loss.item(),
+                                us_on_diag=on_diag.item(),
+                                us_off_diag=off_diag.item(),
                                 time=int(time.time() - start_time))
                     logger.info(json.dumps(stats))
 
             if step % args.val_freq == 0:
                 stop_early = _calc_val_loss_and_save_checkpoint()
                 if stop_early:
+                    if args.rank == 0:
+                        logger.info("epoch: {}  step : {} Unsupervised training early stop ".format(epoch, step))
+                        stats = dict(epoch=epoch, step=step,
+                                    lr_weights=optimizer.param_groups[0]['lr'],
+                                    lr_biases=optimizer.param_groups[1]['lr'],
+                                    us_loss=loss.item(),
+                                    us_on_diag=on_diag.item(),
+                                    us_off_diag=off_diag.item(),
+                                    time=int(time.time() - start_time))
+                        logger.info(json.dumps(stats))
+                        stats = dict(
+                                    lr_weights=optimizer.param_groups[0]['lr'],
+                                    lr_biases=optimizer.param_groups[1]['lr'],
+                                    us_loss=loss.item(),
+                                    us_on_diag=on_diag.item(),
+                                    us_off_diag=off_diag.item()
+                                    )
+                        metricsReporter.plotStats(stats, step, 'UnsupervisedTrain')
+
                     return
         if epoch == 0:
             dataset.reportClipStats()
