@@ -145,7 +145,7 @@ def train(args, logger):
 
         # evaluate on validation set after each epoch
         results = evaluate(model, loader_val, dev, args, logger)
-        logger.info('Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
+        logger.info('Supervised Val Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
         metrics = metricsReporter.calcBinaryStats(predsAll, labelsAll)
         metrics.update(results)
         metricsReporter.plotStats(metrics, ite=epoch, typ='SupervisedValidation')
@@ -162,6 +162,7 @@ def train(args, logger):
         # stop early if validation accuracy does not improve
         stop_early = early_stopper.step(results['accuracy'], epoch+1)
         if stop_early:
+            logger.info("epoch: {}  step : {} Supervised training early stop ".format(epoch, step))
             # Plot PR curves for best 
             results = evaluate(model, loader_val, dev, args, logger, name='Best Validation', doPrPlot=True)
             return
@@ -171,6 +172,7 @@ def train(args, logger):
         dataset_train.resetCounters()
 
     results = evaluate(model, loader_val, dev, args, logger, name='Final Validation', doPrPlot=True)
+    logger.info("Supervised training terminating after Epoch {} Step {}".format(epoch, step))
 
 
 def eval_test_set(args, logger):
@@ -201,13 +203,13 @@ def eval_test_set(args, logger):
         )
     logger.info('Start musicClassifier evaluation on {} samples '.format(len(dataset_test)))
     results = evaluate(model, loader_test, dev, args, logger, name='Test', doPrPlot=True)
-    resultPrint = { k: ":0.3f".format(v) for k,v in results.items()}
+    resultPrint = { k: "{:.3f}".format(float(v)) for k,v in results.items()}
     logger.info("Test result N {} {}".format(len(dataset_test), resultPrint))
 
     metricsReporter = MetricsReporter(args, logger)
     metricsReporter.logValues(results, typ='SupervisedTest')
     dataset_test.reportClipStats()
-    return results
+    logger.info("Supervised testing completed")
 
 def updateCheckPointKeys(chkPoint, subs="module."):
     keys = list(chkPoint.keys())
