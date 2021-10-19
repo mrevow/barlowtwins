@@ -3,6 +3,7 @@ import torch
 from torchaudio import sox_effects
 from typing import List
 import librosa as lb
+import numpy as np
 
 class Identity(nn.Module):
   def __init__(self):
@@ -33,6 +34,53 @@ class SoxEffectTransform(nn.Module):
     #return waveform.squeeze().numpy()
     return waveform.squeeze()
 
+class SoxPitchTransform(nn.Module):
+  def __init__(self, pRange):
+    super().__init__()
+    self.pitch_range = pRange
+
+  def forward(self, tensor: torch.Tensor, sample_rate: int = 16000):
+    pitch = np.random.randint(low=-self.pitch_range, high=self.pitch_range+1)
+    effects = [ ['pitch', f'{pitch}'], ['rate', f'{sample_rate}'] ]
+    waveform, sample_rate = sox_effects.apply_effects_tensor(tensor.unsqueeze(0), sample_rate, effects)
+    return waveform.squeeze()
+
+class SoxGainTransform(nn.Module):
+  def __init__(self, gain):
+    super().__init__()
+    self.gain = gain
+
+  def forward(self, x: torch.Tensor, sample_rate: int = 16000):
+    gain = np.random.randint(low=self.gain, high=1)
+    effects = [ ['gain', '-n', f'{gain}'] ]
+    waveform, sample_rate = sox_effects.apply_effects_tensor(x.unsqueeze(0), sample_rate, effects)
+    return waveform.squeeze()
+
+class WhiteNoiseTransform(nn.Module):
+  def __init__(self, snrLow, snrHigh):
+    super().__init__()
+    self.snr_low = snrLow
+    self.snr_high = snrHigh
+
+  def forward(self, x: torch.Tensor, sample_rate: int = 16000):
+    snr_db = np.random.randint(low=self.snr_low, high=self.snr_high+1)
+    noise = torch.randn_like(x)
+    speech_power = x.norm(p=2)
+    noise_power = noise.norm(p=2)
+    scale = 1/(10 ** (snr_db/10)) * speech_power/noise_power 
+    noise = scale * noise
+    # snr_sanity_check = 10*math.log10(x.norm(p=2)/noise.norm(p=2))
+    x = (x + noise)/2
+    return x.squeeze()
+
+class PolarityTransform(nn.Module):
+  def __init__(self):
+    super().__init__()
+
+  def forward(self, x: torch.Tensor, sample_rate: int = 16000):
+    if np.random.randn()>0:
+      x = -x
+    return x.squeeze()
 
 class LibrPitch(nn.Module):
   '''
