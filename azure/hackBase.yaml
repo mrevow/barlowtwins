@@ -70,7 +70,7 @@ data_transforms_1: [
     ['ExpandDim', {'dim': 0}] 
 ]
 data_transforms_2: [ 
-    ['SoxPitchTransform', {'pRange': 50}], # pRange is +- cent
+    ['SoxPitchTransform', {'pRange': 50}], # +- pRange shift in cent
     ['WhiteNoiseTransform', {'snrLow': 20, 'snrHigh': 60}], 
     ['PolarityTransform', {}], # applied in 50% of cases
     ['SoxGainTransform', {'gain': -10}], # reduces level from [gain to 0] dB
