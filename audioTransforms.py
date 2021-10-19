@@ -4,6 +4,21 @@ from torchaudio import sox_effects
 from typing import List
 import librosa as lb
 import numpy as np
+import soundfile as sf
+import os
+
+def should_save_wav(count, stop_count):
+  if count >= stop_count:
+    return False, None
+  
+  return True, str(uuid.uuid4())
+
+
+def save_file(wav, rate, file_name):
+  try:
+    sf.write(os.path.join("./outputs", file_name+".wav"), wav, rate)
+  except Exception as e:
+    print("Failed saving wav file: {}".format(e))
 
 class Identity(nn.Module):
   def __init__(self):
@@ -28,10 +43,18 @@ class SoxEffectTransform(nn.Module):
   def __init__(self, effects: List[List[str]]):
     super().__init__()
     self.effects = effects
+    self.save_count = 0
 
   def forward(self, tensor: torch.Tensor, sample_rate: int = 16000):
+    should_save, file_name = save_file(self.save_count, self.wav_files_to_save)
+    if(should_save):
+      save_file(tensor, sample_rate, "BT_"+file_name)
+      self.save_count += 1
+    
     waveform, sample_rate = sox_effects.apply_effects_tensor(tensor.unsqueeze(0), sample_rate, self.effects)
-    #return waveform.squeeze().numpy()
+
+    if(should_save):
+      save_file(waveform, sample_rate, "AT_"+file_name)
     return waveform.squeeze()
 
 class SoxPitchTransform(nn.Module):
@@ -42,7 +65,17 @@ class SoxPitchTransform(nn.Module):
   def forward(self, tensor: torch.Tensor, sample_rate: int = 16000):
     pitch = np.random.randint(low=-self.pitch_range, high=self.pitch_range+1)
     effects = [ ['pitch', f'{pitch}'], ['rate', f'{sample_rate}'] ]
+
+    should_save, file_name = save_file(self.save_count, self.wav_files_to_save)
+    if(should_save):
+      save_file(tensor, sample_rate, "BT_"+file_name)
+      self.save_count += 1
+
     waveform, sample_rate = sox_effects.apply_effects_tensor(tensor.unsqueeze(0), sample_rate, effects)
+
+    if(should_save):
+      save_file(waveform, sample_rate, "AT_"+file_name)
+      
     return waveform.squeeze()
 
 class SoxGainTransform(nn.Module):
@@ -53,7 +86,17 @@ class SoxGainTransform(nn.Module):
   def forward(self, x: torch.Tensor, sample_rate: int = 16000):
     gain = np.random.randint(low=self.gain, high=1)
     effects = [ ['gain', '-n', f'{gain}'] ]
+
+    should_save, file_name = save_file(self.save_count, self.wav_files_to_save)
+    if(should_save):
+      save_file(x, sample_rate, "BT_"+file_name)
+      self.save_count += 1
+
     waveform, sample_rate = sox_effects.apply_effects_tensor(x.unsqueeze(0), sample_rate, effects)
+
+    if(should_save):
+      save_file(waveform, sample_rate, "AT_"+file_name)
+
     return waveform.squeeze()
 
 class WhiteNoiseTransform(nn.Module):

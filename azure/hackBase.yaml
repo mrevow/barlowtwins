@@ -58,6 +58,8 @@ data_epoch_checkpoint_freq: 5
 data_pad_duration: 10 # files short than data_pad_duration seconds will be zero padded
 data_short_thresh: 9  # Clips shorter than this are skipped
 
+wav_files_to_save : 10
+
 # Transforms must be one of torchAudio transforms - see https://pytorch.org/audio/stable/transforms.html
 # Each entry is a tuple [TransformName, arguments]
 data_transforms_1: [

@@ -31,6 +31,10 @@ class AudioTransformer(nn.Module):
     else:      
       self.transform_1 = self.createTransforms(self.args.data_transforms_1)
       self.transform_2 = self.createTransforms(self.args.data_transforms_2)
+    
+    self.transform_1.wav_files_to_save = self.args.wav_files_to_save
+    self.transform_2.wav_files_to_save = self.args.wav_files_to_save
+
 
   def createTransforms(self, transformSpec):
     '''
@@ -43,6 +47,7 @@ class AudioTransformer(nn.Module):
       for tCollection in [torchAudioTransforms, localTransforms]:
         if hasattr(tCollection, t):
           trans = getattr(tCollection, t)
+          trans.wav_files_to_save = self.args.wav_files_to_save
           transforms.append(trans(**kwargs))
           found = True
           break
@@ -52,39 +57,9 @@ class AudioTransformer(nn.Module):
     
     self.logger.info("Final Transforms: {} ".format(transforms))
     return nn.Sequential(*transforms)
-  
-  def write_wav_to_azure_with_librosa(self, x, file_name):
-    # Rate is 16K
-    try:
-      sf.write(os.path.join("./outputs", 'lib_'+file_name+".wav"), x, 16000)
-    except Exception as e:
-      print("Failed writting librosa")
-      print(e)
-
-  def write_wav_to_azure_with_torchaudio(self, x, file_name):
-  # Rate is 16K
-  # write as binary file
-    try:
-      print("*** SHAPE {}".format(x.shape))
-      path = os.path.join("./outputs", "torch_"+file_name+".wav")
-      torchaudio.save(path, x, 16000)
-    except Exception as e:
-      print("**Failed writting torchaudio file to outputs")
-      print(e)
 
   def __call__(self, x):
-    # log 1% of the files. 
-    store_audio = random.randint(1, 10) == 5
-
-    file_name = str(uuid.uuid4())
-    if store_audio:
-      print("*** Before any transform")
-      self.write_wav_to_azure_with_librosa(x, file_name+"_BT")
     y1 = self.transform_1(x)
-    
-    if store_audio:
-      print("*** After first transform")
-      self.write_wav_to_azure_with_torchaudio(y1, file_name+"_AT")
     y2 = self.transform_2(x)
     return y1, y2
 
