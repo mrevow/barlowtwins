@@ -148,7 +148,7 @@ def train(args, logger):
         metrics = metricsReporter.calcBinaryStats(predsAll, labelsAll)
         metrics.update(results)
         metricsReporter.plotStats(metrics, ite=epoch, typ='SupervisedValidation')
-        logger.info('Supervised Val Epoch: {}, {} {:0.3f}, best {} {:0.3f}'.format(
+        logger.info('Supervised Val Epoch: {}, {}: {:0.3f}, best {}: {:0.3f}'.format(
             epoch+1, 
             args.music_classifier_early_stop_metric,
             float(results[args.music_classifier_early_stop_metric]), 
