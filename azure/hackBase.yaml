@@ -29,7 +29,8 @@ music_classifier_freeze_backbone: false
 music_classifier_epochs: 1000
 music_classifier_checkpoint_name: music_checkpoint.pth
 music_classifier_learning_rate: 0.0001 # learning rate for supervised training
-music_classifier_early_stop_patience: 20
+music_classifier_early_stop_patience: 100
+music_classifier_early_stop_metric: rec@_0.99
 music_classifier_metrics_at_recall: [0.85, 0.95]  # Precision at recall
 music_classifier_metrics_at_precision: [0.95, 0.99]  # Recall at precision
 music_classifier_metrics_at_fpr: [0.1, 0.2,]  # TPR at FPR

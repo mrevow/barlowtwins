@@ -145,22 +145,27 @@ def train(args, logger):
 
         # evaluate on validation set after each epoch
         results = evaluate(model, loader_val, dev, args, logger)
-        logger.info('Supervised Val Epoch: {}, accuracy {:0.3f}, best accuracy {:0.3f}'.format(epoch+1, results['accuracy'], early_stopper.best_accuracy))
         metrics = metricsReporter.calcBinaryStats(predsAll, labelsAll)
         metrics.update(results)
         metricsReporter.plotStats(metrics, ite=epoch, typ='SupervisedValidation')
+        logger.info('Supervised Val Epoch: {}, {}: {:0.3f}, best {}: {:0.3f}'.format(
+            epoch+1, 
+            args.music_classifier_early_stop_metric,
+            float(results[args.music_classifier_early_stop_metric]), 
+            args.music_classifier_early_stop_metric, 
+            early_stopper.best_metric))
 
         # save checkpoint
-        if results['accuracy']>early_stopper.best_accuracy:
+        if float(results[args.music_classifier_early_stop_metric])>early_stopper.best_metric:
             statedict = model.module.state_dict() if (torch.cuda.device_count()>1) else model.state_dict()
             state = dict(epoch=epoch + 1, model=statedict,
                         optimizer=optimizer.state_dict())
             torch.save(state, args.checkpoint_dir / args.music_classifier_checkpoint_name)
             logger.info('Checkpoint saved {}'.format(args.checkpoint_dir / args.music_classifier_checkpoint_name))
-            logger.log_value(name='val_best_accuracy', value=results['accuracy'])
+            logger.log_value(name='val_best_' + args.music_classifier_early_stop_metric, value=float(results[args.music_classifier_early_stop_metric]))
 
         # stop early if validation accuracy does not improve
-        stop_early = early_stopper.step(results['accuracy'], epoch+1)
+        stop_early = early_stopper.step(float(results[args.music_classifier_early_stop_metric]), epoch+1)
         if stop_early:
             logger.info("epoch: {}  step : {} Supervised training early stop ".format(epoch, step))
             # Plot PR curves for best 
@@ -278,14 +283,15 @@ def evaluate(model, loader, dev, args, logger, name='', doPrPlot=False):
 class EarlyStopper(object):          
     def __init__(self, args):
         self.patience = args.music_classifier_early_stop_patience
+        self.metric = args.music_classifier_early_stop_metric
         self.args = args
-        self.best_accuracy = -1e10
+        self.best_metric = -1e10
         self.best_epoch = 0
         self.cnt = -1
         
-    def step(self, accuracy, epoch):
-        if accuracy > self.best_accuracy:
-            self.best_accuracy = accuracy
+    def step(self, metric, epoch):
+        if metric > self.best_metric:
+            self.best_metric = metric
             self.best_epoch = epoch
             self.cnt = -1          
         self.cnt += 1 
