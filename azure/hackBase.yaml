@@ -61,18 +61,6 @@ data_short_thresh: 9  # Clips shorter than this are skipped
 # Transforms must be one of torchAudio transforms - see https://pytorch.org/audio/stable/transforms.html
 # Each entry is a tuple [TransformName, arguments]
 data_transforms_1: [
-    ['SoxEffectTransform', {'effects': [['pitch', '5'], ['gain', '-n']]}],
-    ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
-    ['ExpandDim', {'dim': 0}] 
-]
-data_transforms_2: [ 
-    ['SoxEffectTransform', {'effects': [['pitch', '5'], ['gain', '-n', '-3']]}],
-    ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
-    ['ExpandDim', {'dim': 0}] 
-  ]
-
-
-data_transforms_1: [
     ['SoxPitchTransform', {'pRange': 50}], # +- pRange shift in cent
     ['WhiteNoiseTransform', {'snrLow': 20, 'snrHigh': 60}], # SNR in dB 
     ['PolarityTransform', {}], # applied in 50% of cases
