@@ -64,7 +64,7 @@ data_transforms_1: [
     ['SoxPitchTransform', {'pRange': 50}], # +- pRange shift in cent
     ['WhiteNoiseTransform', {'snrLow': 20, 'snrHigh': 60}], # SNR in dB 
     ['PolarityTransform', {}], # applied in 50% of cases
-    ['SoxGainTransform', {'gain': -10}], # reduces level from [-gain to 0] dB
+    ['SoxGainTransform', {'gain': -10}], # reduces level from [gain to 0] dB
 
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
@@ -73,7 +73,7 @@ data_transforms_2: [
     ['SoxPitchTransform', {'pRange': 50}], # pRange is +- cent
     ['WhiteNoiseTransform', {'snrLow': 20, 'snrHigh': 60}], 
     ['PolarityTransform', {}], # applied in 50% of cases
-    ['SoxGainTransform', {'gain': -10}], # reduces level from [-gain to 0] dB
+    ['SoxGainTransform', {'gain': -10}], # reduces level from [gain to 0] dB
 
     ['MelSpectrogram' , {'n_fft': 1024, 'hop_length': 800, 'n_mels': 64}],
     ['ExpandDim', {'dim': 0}] 
